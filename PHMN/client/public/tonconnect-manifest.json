@@ -1,0 +1,22 @@
+{
+  "url": "https://64.hexterminator.xyz",
+  "name": "Ludo Game",
+  "iconUrl": "https://64.hexterminator.xyz/ludo512.png",
+  "termsOfUseUrl": "https://64.hexterminator.xyz/terms",
+  "privacyPolicyUrl": "https://64.hexterminator.xyz/privacy",
+  "version": "1.0.0",
+  "description": "Play Ludo with friends and earn rewards in this exciting board game!",
+  "features": [
+    "multiplayer",
+    "referral_system",
+    "mining_rewards",
+    "bot_games"
+  ],
+  "categories": ["games", "entertainment"],
+  "platforms": ["telegram", "web", "mobile"],
+  "author": "Ludo Game Team",
+  "support": "https://t.me/ludoremastered",
+  "universalLink": "https://64.hexterminator.xyz",
+  "appStoreId": "your-app-store-id",
+  "googlePlayId": "your-google-play-id"
+}
