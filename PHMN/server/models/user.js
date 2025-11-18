@@ -52,6 +52,7 @@ const userSchema = new mongoose.Schema({
   miningSessionEndTime: { type: Date, default: null }, // When the current 8-hour session ends (startTime + 8 hours)
   miningSessionPendingRewards: { type: Number, default: 0 }, // earned but not yet claimed
   miningRate: { type: Number, default: 100 }, // per hour (default 100 PHMN/HR)
+  timezone: { type: String, default: null }, // User's timezone (e.g., "America/New_York", "Europe/London")
   
 
   // TON wallet integration

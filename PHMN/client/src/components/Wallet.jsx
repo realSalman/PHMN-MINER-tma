@@ -179,6 +179,47 @@ function Wallet({ telegramUser }) {
     
     return '';
   }, [user?.walletAddress]);
+  
+  useEffect(() => {
+    if (!socket || !telegramUser?.id) return;
+
+    let isMounted = true;
+
+    const fetchBalanceFromServer = () => {
+      socket.emit('playMining:status', { telegramId: telegramUser.id }, (response) => {
+        if (!isMounted) return;
+
+        if (response?.success) {
+          const nextBalance = response.PHMN ?? response.balance ?? 0;
+
+          setBalanceInfo((prev) => ({
+            ...prev,
+            phmnBalance: nextBalance,
+          }));
+
+          setUser((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  phmnBalance: nextBalance,
+                  balance: nextBalance,
+                }
+              : prev
+          );
+        } else {
+          console.error('❌ Wallet: Failed to sync PHMN balance:', response?.error);
+        }
+      });
+    };
+
+    fetchBalanceFromServer();
+    const balanceInterval = setInterval(fetchBalanceFromServer, 5000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(balanceInterval);
+    };
+  }, [socket, telegramUser?.id, refreshTrigger]);
 
   const phmnBalance = useMemo(() => {
     const rawValue =
@@ -199,11 +240,11 @@ function Wallet({ telegramUser }) {
   const formattedBalance = useMemo(() => {
     try {
       return phmnBalance.toLocaleString(undefined, {
-        minimumFractionDigits: 3,
-        maximumFractionDigits: 3,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
       });
     } catch (error) {
-      return '0.000';
+      return '0';
     }
   }, [phmnBalance]);
 

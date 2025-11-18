@@ -21,9 +21,86 @@ function Play() {
   const [estimatedRewards, setEstimatedRewards] = useState(0);
   const [miningProgress, setMiningProgress] = useState(0); // 0-100%
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
+  const [showTimezoneModal, setShowTimezoneModal] = useState(false);
+  const [selectedTimezone, setSelectedTimezone] = useState('');
+  const [timezoneSearch, setTimezoneSearch] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
   const appSocket = useContext(SocketContext);
+  
+  // All major timezones of the world (40+ timezones)
+  const timezones = [
+    // North America
+    { value: 'America/New_York', label: 'New York - Eastern Time (ET)' },
+    { value: 'America/Chicago', label: 'Chicago - Central Time (CT)' },
+    { value: 'America/Denver', label: 'Denver - Mountain Time (MT)' },
+    { value: 'America/Phoenix', label: 'Phoenix - Mountain Time (MST)' },
+    { value: 'America/Los_Angeles', label: 'Los Angeles - Pacific Time (PT)' },
+    { value: 'America/Anchorage', label: 'Anchorage - Alaska Time (AKT)' },
+    { value: 'America/Honolulu', label: 'Honolulu - Hawaii Time (HST)' },
+    { value: 'America/Toronto', label: 'Toronto - Eastern Time (ET)' },
+    { value: 'America/Vancouver', label: 'Vancouver - Pacific Time (PT)' },
+    { value: 'America/Mexico_City', label: 'Mexico City - Central Time (CST)' },
+    
+    // South America
+    { value: 'America/Sao_Paulo', label: 'São Paulo - Brasília Time (BRT)' },
+    { value: 'America/Buenos_Aires', label: 'Buenos Aires - Argentina Time (ART)' },
+    { value: 'America/Lima', label: 'Lima - Peru Time (PET)' },
+    { value: 'America/Bogota', label: 'Bogotá - Colombia Time (COT)' },
+    { value: 'America/Santiago', label: 'Santiago - Chile Time (CLT)' },
+    { value: 'America/Caracas', label: 'Caracas - Venezuela Time (VET)' },
+    
+    // Europe
+    { value: 'Europe/London', label: 'London - Greenwich Mean Time (GMT)' },
+    { value: 'Europe/Paris', label: 'Paris - Central European Time (CET)' },
+    { value: 'Europe/Berlin', label: 'Berlin - Central European Time (CET)' },
+    { value: 'Europe/Rome', label: 'Rome - Central European Time (CET)' },
+    { value: 'Europe/Madrid', label: 'Madrid - Central European Time (CET)' },
+    { value: 'Europe/Amsterdam', label: 'Amsterdam - Central European Time (CET)' },
+    { value: 'Europe/Athens', label: 'Athens - Eastern European Time (EET)' },
+    { value: 'Europe/Moscow', label: 'Moscow - Moscow Time (MSK)' },
+    { value: 'Europe/Istanbul', label: 'Istanbul - Turkey Time (TRT)' },
+    { value: 'Europe/Kiev', label: 'Kyiv - Eastern European Time (EET)' },
+    { value: 'Europe/Stockholm', label: 'Stockholm - Central European Time (CET)' },
+    { value: 'Europe/Warsaw', label: 'Warsaw - Central European Time (CET)' },
+    
+    // Africa
+    { value: 'Africa/Cairo', label: 'Cairo - Eastern European Time (EET)' },
+    { value: 'Africa/Johannesburg', label: 'Johannesburg - South Africa Time (SAST)' },
+    { value: 'Africa/Lagos', label: 'Lagos - West Africa Time (WAT)' },
+    { value: 'Africa/Nairobi', label: 'Nairobi - East Africa Time (EAT)' },
+    { value: 'Africa/Casablanca', label: 'Casablanca - Morocco Time (WET)' },
+    
+    // Middle East
+    { value: 'Asia/Dubai', label: 'Dubai - Gulf Standard Time (GST)' },
+    { value: 'Asia/Riyadh', label: 'Riyadh - Arabia Standard Time (AST)' },
+    { value: 'Asia/Tehran', label: 'Tehran - Iran Standard Time (IRST)' },
+    { value: 'Asia/Jerusalem', label: 'Jerusalem - Israel Time (IST)' },
+    { value: 'Asia/Baghdad', label: 'Baghdad - Arabia Standard Time (AST)' },
+    
+    // Asia
+    { value: 'Asia/Kolkata', label: 'Mumbai/New Delhi - India Standard Time (IST)' },
+    { value: 'Asia/Karachi', label: 'Karachi - Pakistan Standard Time (PKT)' },
+    { value: 'Asia/Dhaka', label: 'Dhaka - Bangladesh Time (BST)' },
+    { value: 'Asia/Bangkok', label: 'Bangkok - Indochina Time (ICT)' },
+    { value: 'Asia/Jakarta', label: 'Jakarta - Western Indonesia Time (WIB)' },
+    { value: 'Asia/Manila', label: 'Manila - Philippine Time (PHT)' },
+    { value: 'Asia/Singapore', label: 'Singapore - Singapore Time (SGT)' },
+    { value: 'Asia/Hong_Kong', label: 'Hong Kong - Hong Kong Time (HKT)' },
+    { value: 'Asia/Shanghai', label: 'Shanghai - China Standard Time (CST)' },
+    { value: 'Asia/Tokyo', label: 'Tokyo - Japan Standard Time (JST)' },
+    { value: 'Asia/Seoul', label: 'Seoul - Korea Standard Time (KST)' },
+    { value: 'Asia/Vladivostok', label: 'Vladivostok - Vladivostok Time (VLAT)' },
+    
+    // Oceania
+    { value: 'Australia/Sydney', label: 'Sydney - Australian Eastern Time (AEST)' },
+    { value: 'Australia/Melbourne', label: 'Melbourne - Australian Eastern Time (AEST)' },
+    { value: 'Australia/Brisbane', label: 'Brisbane - Australian Eastern Time (AEST)' },
+    { value: 'Australia/Perth', label: 'Perth - Australian Western Time (AWST)' },
+    { value: 'Australia/Adelaide', label: 'Adelaide - Australian Central Time (ACST)' },
+    { value: 'Pacific/Auckland', label: 'Auckland - New Zealand Time (NZST)' },
+    { value: 'Pacific/Honolulu', label: 'Honolulu - Hawaii Time (HST)' },
+  ];
 
   // Initialize Telegram WebApp
   useEffect(() => {
@@ -176,15 +253,28 @@ function Play() {
           // This ensures balance always reflects the actual database value
           const dbPHMN = response.PHMN || 0;
           setBalance(dbPHMN);
-          setEstimatedRewards(response.miningRate * 8);
+          
+          // Calculate estimated rewards based on cycle duration (if available)
+          if (response.startTime && response.endTime) {
+            const startTime = new Date(response.startTime);
+            const endTime = new Date(response.endTime);
+            const cycleDurationHours = (endTime - startTime) / (1000 * 60 * 60);
+            setEstimatedRewards(response.miningRate * cycleDurationHours);
+          } else {
+            // Fallback to 8 hours if cycle info not available
+            setEstimatedRewards(response.miningRate * 8);
+          }
           
           console.log('💾 Play: Balance updated from DB PHMN:', dbPHMN);
 
-          // Calculate progress percentage (0-100%)
-          if (response.sessionStatus === 'active' && response.remainingTime > 0) {
-            const totalSessionTime = 8 * 60 * 60; // 8 hours in seconds
-            const elapsedTime = totalSessionTime - response.remainingTime;
-            const progress = Math.min(100, (elapsedTime / totalSessionTime) * 100);
+          // Calculate progress percentage (0-100%) based on actual cycle duration
+          if (response.sessionStatus === 'active' && response.remainingTime > 0 && response.startTime && response.endTime) {
+            const startTime = new Date(response.startTime);
+            const endTime = new Date(response.endTime);
+            const now = new Date();
+            const totalSessionTime = (endTime - startTime) / 1000; // Total cycle duration in seconds
+            const elapsedTime = (now - startTime) / 1000; // Elapsed time in seconds
+            const progress = Math.min(100, Math.max(0, (elapsedTime / totalSessionTime) * 100));
             setMiningProgress(progress);
           } else if (response.sessionStatus === 'completed') {
             setMiningProgress(100);
@@ -220,11 +310,14 @@ function Play() {
                 setBalance(dbPHMN);
                 console.log('🔄 Play: Balance synced from DB:', dbPHMN);
 
-                // Update progress
-                if (response.sessionStatus === 'active' && response.remainingTime > 0) {
-                  const totalSessionTime = 8 * 60 * 60;
-                  const elapsedTime = totalSessionTime - response.remainingTime;
-                  const progress = Math.min(100, (elapsedTime / totalSessionTime) * 100);
+                // Update progress based on actual cycle duration
+                if (response.sessionStatus === 'active' && response.remainingTime > 0 && response.startTime && response.endTime) {
+                  const startTime = new Date(response.startTime);
+                  const endTime = new Date(response.endTime);
+                  const now = new Date();
+                  const totalSessionTime = (endTime - startTime) / 1000;
+                  const elapsedTime = (now - startTime) / 1000;
+                  const progress = Math.min(100, Math.max(0, (elapsedTime / totalSessionTime) * 100));
                   setMiningProgress(progress);
                 } else if (response.sessionStatus === 'completed') {
                   setMiningProgress(100);
@@ -246,6 +339,39 @@ function Play() {
     };
   }, [appSocket, user]);
 
+  // Check if user has timezone set
+  const checkTimezoneAndStart = () => {
+    if (!appSocket || !appSocket.connected || !user) return;
+
+    // First check if user has timezone set
+    appSocket.emit('playMining:status', { telegramId: user.id }, (statusResponse) => {
+      if (statusResponse?.success) {
+        // Check if we need to get timezone from user
+        // We'll try to start mining and see if server asks for timezone
+        startMining();
+      } else {
+        console.error('Failed to check status:', statusResponse?.error);
+      }
+    });
+  };
+
+  // Set user timezone
+  const setUserTimezone = (timezone) => {
+    if (!appSocket || !appSocket.connected || !user) return;
+
+    appSocket.emit('user:setTimezone', { telegramId: user.id, timezone }, (response) => {
+      if (response?.success) {
+        console.log('✅ Timezone set successfully:', timezone);
+        setShowTimezoneModal(false);
+        // Now start mining
+        startMining();
+      } else {
+        console.error('Failed to set timezone:', response?.error);
+        alert(response?.error || 'Failed to set timezone');
+      }
+    });
+  };
+
   // Start mining session
   const startMining = () => {
     if (!appSocket || !appSocket.connected || !user) return;
@@ -261,7 +387,13 @@ function Play() {
         setRemainingTime(Math.max(0, Math.floor((endTime - now) / 1000)));
       } else {
         console.error('Failed to start mining:', response?.error);
-        alert(response?.error || 'Failed to start mining session');
+        
+        // Check if timezone is required
+        if (response?.requiresTimezone) {
+          setShowTimezoneModal(true);
+        } else {
+          alert(response?.error || 'Failed to start mining session');
+        }
       }
     });
   };
@@ -316,8 +448,8 @@ function Play() {
       setRemainingTime((prev) => {
         if (prev <= 1) {
           setMiningState('completed');
-          // Calculate final rewards
-          setPendingRewards(miningRate * 8);
+          // Final rewards are calculated server-side based on actual cycle duration
+          // Server will update pendingRewards in the next status sync
           return 0;
         }
         return prev - 1;
@@ -352,6 +484,7 @@ function Play() {
   }, [miningState, appSocket, user]);
 
   // Update pending rewards and progress during active mining (proportional to elapsed time)
+  // Note: This is handled by server status updates, but we keep this for local UI updates
   useEffect(() => {
     if (miningState !== 'active' || remainingTime === 0) {
       if (miningState === 'completed') {
@@ -362,15 +495,9 @@ function Play() {
       return;
     }
 
-    const totalSessionTime = 8 * 60 * 60; // 8 hours in seconds
-    const elapsedTime = totalSessionTime - remainingTime;
-    const elapsedHours = elapsedTime / 3600;
-    const calculatedRewards = Math.min(miningRate * 8, miningRate * elapsedHours);
-    setPendingRewards(Math.floor(calculatedRewards));
-
-    // Update progress percentage
-    const progress = Math.min(100, (elapsedTime / totalSessionTime) * 100);
-    setMiningProgress(progress);
+    // Progress and rewards are now calculated server-side based on actual cycle duration
+    // This effect mainly handles local UI updates
+    // The server sends accurate pendingRewards in status updates
   }, [miningState, remainingTime, miningRate]);
 
   const formatTime = (sec) => {
@@ -451,7 +578,7 @@ function Play() {
       <div className="px-6 relative z-50">
         {miningState === 'idle' && (
         <button
-            onClick={startMining}
+            onClick={checkTimezoneAndStart}
           className="mx-auto block -mt-8 w-full max-w-[280px] py-3 rounded-full bg-gradient-to-b from-[#a855f7] to-[#7c3aed] shadow-lg shadow-purple-900/40 text-white relative z-50"
         >
             Start Mining
@@ -567,6 +694,84 @@ function Play() {
         
         {miningState === 'active'}
       </div>
+
+      {/* Timezone Selection Modal */}
+      {showTimezoneModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-b from-[#1a0f2e] to-[#2d1b4e] rounded-2xl p-6 max-w-md w-full border border-purple-500/30 max-h-[70vh] flex flex-col">
+            <h2 className="text-2xl font-bold text-white mb-2 text-center">Select Your Timezone</h2>
+            <p className="text-sm text-gray-300 mb-4 text-center">
+              Choose your timezone to set up mining cycles. This will only be asked once.
+            </p>
+            
+            {/* Search input */}
+            <input
+              type="text"
+              placeholder="Search timezone..."
+              value={timezoneSearch}
+              onChange={(e) => setTimezoneSearch(e.target.value)}
+              className="w-full px-4 py-2 mb-4 rounded-lg bg-purple-900/30 text-white border border-purple-500/30 focus:outline-none focus:border-purple-400 placeholder-gray-400"
+            />
+            
+            {/* Timezone list with scroll */}
+            <div className="flex-1 overflow-y-auto mb-4 space-y-2 min-h-0">
+              {timezones
+                .filter((tz) => 
+                  tz.label.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
+                  tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
+                )
+                .map((tz) => (
+                  <button
+                    key={tz.value}
+                    onClick={() => setSelectedTimezone(tz.value)}
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+                      selectedTimezone === tz.value
+                        ? 'bg-purple-600 text-white border-2 border-purple-400'
+                        : 'bg-purple-900/30 text-gray-200 border-2 border-transparent hover:bg-purple-800/50'
+                    }`}
+                  >
+                    {tz.label}
+                  </button>
+                ))}
+              {timezones.filter((tz) => 
+                tz.label.toLowerCase().includes(timezoneSearch.toLowerCase()) ||
+                tz.value.toLowerCase().includes(timezoneSearch.toLowerCase())
+              ).length === 0 && (
+                <div className="text-center text-gray-400 py-4">
+                  No timezones found matching "{timezoneSearch}"
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowTimezoneModal(false);
+                  setSelectedTimezone('');
+                  setTimezoneSearch('');
+                }}
+                className="flex-1 py-3 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedTimezone) {
+                    setUserTimezone(selectedTimezone);
+                    setTimezoneSearch('');
+                  } else {
+                    alert('Please select a timezone');
+                  }
+                }}
+                className="flex-1 py-3 rounded-lg bg-gradient-to-b from-[#a855f7] to-[#7c3aed] text-white hover:from-[#9333ea] hover:to-[#6d28d9] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!selectedTimezone}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Keyframes for floating labels */}
       <style>{`

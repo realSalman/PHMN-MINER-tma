@@ -821,7 +821,212 @@ const registerUserHandlers = (socket) => {
   // 8-HOUR MINING SESSION HANDLERS (for Play.js)
   // ============================================
   
-  // Start a new 8-hour mining session
+  // Helper function to get current time in user's timezone
+  const getCurrentTimeInTimezone = (timezone) => {
+    if (!timezone) {
+      // Default to UTC if no timezone set
+      return new Date();
+    }
+    
+    try {
+      // Get current time in user's timezone
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      const parts = formatter.formatToParts(now);
+      const year = parseInt(parts.find(p => p.type === 'year').value);
+      const month = parseInt(parts.find(p => p.type === 'month').value) - 1;
+      const day = parseInt(parts.find(p => p.type === 'day').value);
+      const hour = parseInt(parts.find(p => p.type === 'hour').value);
+      const minute = parseInt(parts.find(p => p.type === 'minute').value);
+      const second = parseInt(parts.find(p => p.type === 'second').value);
+      
+      // Create date in UTC that represents the local time in user's timezone
+      return new Date(Date.UTC(year, month, day, hour, minute, second));
+    } catch (error) {
+      console.error('Error getting time in timezone:', error);
+      return new Date();
+    }
+  };
+  
+  // Helper function to get current cycle and cycle end time based on user's timezone
+  // Cycles: 07:00-15:00 (8h), 15:00-21:00 (6h), 21:00-07:00 (10h)
+  const getCurrentCycle = (timezone) => {
+    if (!timezone) {
+      return { cycle: null, cycleEndTime: null, remainingSeconds: 0 };
+    }
+    
+    try {
+      const now = new Date();
+      
+      // Get current date/time components in user's timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      });
+      
+      const parts = formatter.formatToParts(now);
+      const year = parseInt(parts.find(p => p.type === 'year').value);
+      const month = parseInt(parts.find(p => p.type === 'month').value) - 1;
+      const day = parseInt(parts.find(p => p.type === 'day').value);
+      const currentHour = parseInt(parts.find(p => p.type === 'hour').value);
+      const currentMinute = parseInt(parts.find(p => p.type === 'minute').value);
+      
+      let cycleEndHour, cycleEndMinute, cycleEndDay = day, cycleEndMonth = month, cycleEndYear = year;
+      
+      // Determine current cycle and calculate end time
+      if (currentHour >= 7 && currentHour < 15) {
+        // Cycle 1: 07:00 → 15:00
+        cycleEndHour = 15;
+        cycleEndMinute = 0;
+      } else if (currentHour >= 15 && currentHour < 21) {
+        // Cycle 2: 15:00 → 21:00
+        cycleEndHour = 21;
+        cycleEndMinute = 0;
+      } else {
+        // Cycle 3: 21:00 → 07:00 (next day)
+        cycleEndHour = 7;
+        cycleEndMinute = 0;
+        // Handle day/month/year rollover
+        const nextDay = new Date(year, month, day + 1);
+        cycleEndDay = nextDay.getDate();
+        cycleEndMonth = nextDay.getMonth();
+        cycleEndYear = nextDay.getFullYear();
+      }
+      
+      // Calculate cycle end time in UTC
+      // We need to find the UTC timestamp that, when formatted in the user's timezone, gives us cycleEndHour:cycleEndMinute
+      // Use binary search approach for efficiency
+      let cycleEndTimeFinal = null;
+      const cycleDurations = { 1: 8 * 3600, 2: 6 * 3600, 3: 10 * 3600 };
+      const currentCycle = currentHour >= 7 && currentHour < 15 ? 1 : (currentHour >= 15 && currentHour < 21 ? 2 : 3);
+      
+      // Start search from current time, going forward up to 24 hours
+      let low = now.getTime();
+      let high = now.getTime() + 24 * 60 * 60 * 1000;
+      let bestMatch = null;
+      let bestDiff = Infinity;
+      
+      // Binary search for the cycle end time
+      for (let i = 0; i < 20; i++) {
+        const mid = Math.floor((low + high) / 2);
+        const candidate = new Date(mid);
+        const candidateParts = new Intl.DateTimeFormat('en-US', {
+          timeZone: timezone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).formatToParts(candidate);
+        
+        const candidateHour = parseInt(candidateParts.find(p => p.type === 'hour').value);
+        const candidateDay = parseInt(candidateParts.find(p => p.type === 'day').value);
+        const candidateMonth = parseInt(candidateParts.find(p => p.type === 'month').value) - 1;
+        const candidateYear = parseInt(candidateParts.find(p => p.type === 'year').value);
+        
+        // Check if this is our target time
+        if (candidateHour === cycleEndHour && 
+            candidateDay === cycleEndDay && 
+            candidateMonth === cycleEndMonth && 
+            candidateYear === cycleEndYear) {
+          const diff = Math.abs(candidate.getTime() - now.getTime());
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            bestMatch = candidate;
+          }
+          // Found a match, but continue searching for closer matches
+          if (candidate.getTime() < now.getTime()) {
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        } else {
+          // Compare to determine search direction
+          const candidateTime = candidateYear * 100000000 + candidateMonth * 1000000 + candidateDay * 10000 + candidateHour * 100 + parseInt(candidateParts.find(p => p.type === 'minute').value);
+          const targetTime = cycleEndYear * 100000000 + cycleEndMonth * 1000000 + cycleEndDay * 10000 + cycleEndHour * 100;
+          
+          if (candidateTime < targetTime) {
+            low = mid + 1;
+          } else {
+            high = mid - 1;
+          }
+        }
+      }
+      
+      if (bestMatch) {
+        cycleEndTimeFinal = bestMatch;
+      } else {
+        // Fallback: calculate based on current time and cycle duration
+        cycleEndTimeFinal = new Date(now.getTime() + cycleDurations[currentCycle] * 1000);
+      }
+      
+      // Calculate remaining seconds until cycle end
+      const remainingMs = cycleEndTimeFinal.getTime() - now.getTime();
+      const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+      
+      return {
+        cycle: currentHour >= 7 && currentHour < 15 ? 1 : (currentHour >= 15 && currentHour < 21 ? 2 : 3),
+        cycleEndTime: cycleEndTimeFinal,
+        remainingSeconds: remainingSeconds
+      };
+    } catch (error) {
+      console.error('Error calculating cycle:', error);
+      return { cycle: null, cycleEndTime: null, remainingSeconds: 0 };
+    }
+  };
+  
+  // Helper function to set user timezone
+  socket.on('user:setTimezone', async (data, callback) => {
+    try {
+      const telegramId = data?.telegramId || socket.request.session?.telegramId;
+      if (!telegramId) {
+        return callback && callback({ success: false, error: 'Not authenticated' });
+      }
+      
+      const { timezone } = data;
+      if (!timezone) {
+        return callback && callback({ success: false, error: 'Timezone is required' });
+      }
+      
+      const user = await User.findOne({ telegramId: parseInt(telegramId) });
+      if (!user) {
+        return callback && callback({ success: false, error: 'User not found' });
+      }
+      
+      user.timezone = timezone;
+      await user.save();
+      
+      console.log(`✅ User ${telegramId} timezone set to: ${timezone}`);
+      
+      callback && callback({
+        success: true,
+        timezone: timezone,
+        message: 'Timezone set successfully'
+      });
+    } catch (error) {
+      console.error('Error setting timezone:', error);
+      callback && callback({ success: false, error: error.message });
+    }
+  });
+  
+  // Start a new mining session (cycle-based)
   socket.on('playMining:start', async (data, callback) => {
     try {
       const telegramId = data?.telegramId || socket.request.session?.telegramId;
@@ -832,6 +1037,15 @@ const registerUserHandlers = (socket) => {
       const user = await User.findOne({ telegramId: parseInt(telegramId) });
       if (!user) {
         return callback && callback({ success: false, error: 'User not found' });
+      }
+
+      // Check if timezone is set, if not return error (client should set it first)
+      if (!user.timezone) {
+        return callback && callback({ 
+          success: false, 
+          error: 'Timezone not set',
+          requiresTimezone: true
+        });
       }
 
       // Check if there's an active session
@@ -856,21 +1070,45 @@ const registerUserHandlers = (socket) => {
         }
       }
 
-      // Start new 8-hour session
+      // Get current cycle based on user's timezone
+      const cycleInfo = getCurrentCycle(user.timezone);
+      
+      if (!cycleInfo.cycle || !cycleInfo.cycleEndTime) {
+        return callback && callback({ 
+          success: false, 
+          error: 'Failed to calculate mining cycle' 
+        });
+      }
+
+      // Start mining session - join current cycle
       const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + 8 * 60 * 60 * 1000); // 8 hours
+      const endTime = cycleInfo.cycleEndTime; // Cycle end time
 
       user.miningSessionStartTime = startTime;
       user.miningSessionEndTime = endTime;
       user.miningSessionPendingRewards = 0; // Reset pending rewards
       await user.save();
 
+      // Calculate estimated rewards based on cycle duration
+      const cycleDurationHours = cycleInfo.remainingSeconds / 3600;
+      const estimatedRewards = (user.miningRate || 100) * cycleDurationHours;
+
+      console.log(`✅ Mining session started for user ${telegramId}:`, {
+        cycle: cycleInfo.cycle,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        durationHours: cycleDurationHours.toFixed(2),
+        estimatedRewards: estimatedRewards.toFixed(2)
+      });
+
       callback && callback({
         success: true,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         miningRate: user.miningRate || 100,
-        estimatedRewards: (user.miningRate || 100) * 8 // 8 hours * rate
+        estimatedRewards: estimatedRewards,
+        cycle: cycleInfo.cycle,
+        remainingTime: cycleInfo.remainingSeconds
       });
     } catch (error) {
       console.error('Error starting mining session:', error);
@@ -914,14 +1152,16 @@ const registerUserHandlers = (socket) => {
           sessionStatus = 'active';
           remainingTime = Math.max(0, Math.floor((user.miningSessionEndTime - now) / 1000));
           
-          // Calculate earned rewards so far (proportional to time elapsed)
+          // Calculate earned rewards so far (proportional to time elapsed in cycle)
           const elapsedHours = (now - user.miningSessionStartTime) / (1000 * 60 * 60);
-          const totalRewards = (user.miningRate || 100) * 8; // 8 hours worth
+          const totalCycleHours = (user.miningSessionEndTime - user.miningSessionStartTime) / (1000 * 60 * 60);
+          const totalRewards = (user.miningRate || 100) * totalCycleHours;
           pendingRewards = Math.min(totalRewards, (user.miningRate || 100) * elapsedHours);
           
           console.log('✅ playMining:status - Active session:', {
             remainingTime,
             elapsedHours: elapsedHours.toFixed(2),
+            totalCycleHours: totalCycleHours.toFixed(2),
             pendingRewards: Math.floor(pendingRewards)
           });
         } else {
@@ -929,8 +1169,9 @@ const registerUserHandlers = (socket) => {
           sessionStatus = 'completed';
           remainingTime = 0;
           
-          // Calculate final rewards (full 8 hours)
-          const calculatedRewards = (user.miningRate || 100) * 8;
+          // Calculate final rewards based on actual cycle duration
+          const totalCycleHours = (user.miningSessionEndTime - user.miningSessionStartTime) / (1000 * 60 * 60);
+          const calculatedRewards = (user.miningRate || 100) * totalCycleHours;
           
           // Always update pending rewards when session is completed
           if (user.miningSessionPendingRewards !== calculatedRewards) {
