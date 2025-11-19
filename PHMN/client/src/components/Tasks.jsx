@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { SocketContext } from '../App';
 import tasksImg from '../images/tasks.png';
@@ -18,7 +18,6 @@ const Tasks = ({ telegramUser, botUsername }) => {
   const [referralCode, setReferralCode] = useState('');
   const [referralStats, setReferralStats] = useState(null);
   const [referralLoading, setReferralLoading] = useState(false);
-  const [showReferralModal, setShowReferralModal] = useState(false);
   const [referralInput, setReferralInput] = useState('');
   const [activeTab, setActiveTab] = useState('tasks');
   const [botUsernameState, setBotUsernameState] = useState(botUsername || '');
@@ -41,21 +40,7 @@ const Tasks = ({ telegramUser, botUsername }) => {
     setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  useEffect(() => {
-    if (!socket || !telegramUser) return;
-    loadTasks(); loadReferralCode(); loadReferralStats(); loadGameStats();
-    const handleRankStats = (data) => { if (data.success) setGameStats(data); };
-    socket.on('rank:stats', handleRankStats);
-    
-    // Get bot username from server if not provided as prop
-    if (!botUsernameState) {
-      loadBotUsername();
-    }
-    
-    return () => socket.off('rank:stats', handleRankStats);
-  }, [socket, telegramUser]);
-
-  const loadBotUsername = () => {
+const loadBotUsername = useCallback(() => {
     if (!socket) return;
     socket.emit('app:getBotUsername', {}, (res) => {
       if (res?.success && res.botUsername) {
@@ -77,41 +62,56 @@ const Tasks = ({ telegramUser, botUsername }) => {
         }
       }
     });
-  };
+}, [socket]);
 
-
-
-  const loadTasks = () => {
+const loadTasks = useCallback(() => {
     setTasksLoading(true); setError(null);
     socket.emit('tasks:getAvailable', { telegramId: telegramUser.id }, (res) => {
       if (!res?.success) setError(res?.error || 'Failed to load tasks');
       else setTasks(res.tasks || []);
       setTasksLoading(false);
     });
-  };
+}, [socket, telegramUser]);
 
-  const loadReferralCode = () => {
+const loadReferralCode = useCallback(() => {
     if (!socket || !telegramUser) return;
     socket.emit('referral:getCode', { telegramId: telegramUser.id }, (res) => {
       if (res?.success) setReferralCode(res.referralCode);
     });
-  };
+}, [socket, telegramUser]);
 
-  const loadReferralStats = () => {
+const loadReferralStats = useCallback(() => {
     if (!socket || !telegramUser) return;
     setReferralLoading(true);
     socket.emit('referral:getStats', { telegramId: telegramUser.id }, (res) => {
       if (res?.success) setReferralStats(res.stats);
       setReferralLoading(false);
     });
-  };
+}, [socket, telegramUser]);
 
-  const loadGameStats = () => {
+const loadGameStats = useCallback(() => {
     if (!socket || !telegramUser) return;
     socket.emit('rank:getStats', telegramUser.id);
-  };
+}, [socket, telegramUser]);
 
-  const claimTaskReward = (taskId, additionalData = {}) => {
+useEffect(() => {
+  if (!socket || !telegramUser) return;
+  loadTasks();
+  loadReferralCode();
+  loadReferralStats();
+  loadGameStats();
+
+  const handleRankStats = (data) => { if (data.success) setGameStats(data); };
+  socket.on('rank:stats', handleRankStats);
+  
+  if (!botUsernameState) {
+    loadBotUsername();
+  }
+  
+  return () => socket.off('rank:stats', handleRankStats);
+}, [socket, telegramUser, botUsernameState, loadTasks, loadReferralCode, loadReferralStats, loadGameStats, loadBotUsername]);
+
+const claimTaskReward = useCallback((taskId, additionalData = {}) => {
     if (!socket || !telegramUser) return;
     socket.emit('tasks:claimReward', { telegramId: telegramUser.id, taskId, ...additionalData }, (res) => {
       if (res?.success) { 
@@ -140,7 +140,7 @@ const Tasks = ({ telegramUser, botUsername }) => {
         }
       }
     });
-  };
+}, [socket, telegramUser, loadTasks, loadReferralStats, loadGameStats, showNotification]);
 
   const handleChannelJoin = (task) => {
     if (task.channelLink) {

@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { SocketContext } from '../App';
 import { useTonConnect } from '../hooks/useTonConnect';
-import { MINING_PLAN_PRICES, SERVER_WALLET_ADDRESS } from '../config/tonConnect';
+import { SERVER_WALLET_ADDRESS } from '../config/tonConnect';
 import { toUserFriendlyAddress } from '@tonconnect/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import tonIcon from '../images/ton.svg';
@@ -72,18 +72,6 @@ function MiningPage({ telegramUser }) {
     }
   };
 
-  const planVariants = {
-    hidden: { opacity: 0, y: 10 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.3,
-        ease: [0.4, 0, 0.2, 1]
-      }
-    }
-  };
-
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: {
@@ -135,12 +123,6 @@ function MiningPage({ telegramUser }) {
     { id: 'exchange', label: 'EXCHANGE', icon: '🔄' }
   ];
 
-  const [plans, setPlans] = useState([]);
-  const [currentLevel, setCurrentLevel] = useState(0);
-  const [boostMultiplier, setBoostMultiplier] = useState(1);
-  const [loadingPlans, setLoadingPlans] = useState(false);
-  const [shopError, setShopError] = useState(null);
-  
   // White Diamond state
   const [whiteDiamonds, setWhiteDiamonds] = useState(0);
   const [loadingDiamonds, setLoadingDiamonds] = useState(false);
@@ -169,28 +151,15 @@ function MiningPage({ telegramUser }) {
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   // Blue Diamond to TON exchange options
-  const [blueDiamondExchangeOptions, setBlueDiamondExchangeOptions] = useState([
+  const [blueDiamondExchangeOptions] = useState([
     { id: 1, blueDiamonds: 1198, tonAmount: 5.99, popular: false },
     { id: 2, blueDiamonds: 3998, tonAmount: 19.99, popular: true },
     { id: 3, blueDiamonds: 7998, tonAmount: 39.99, popular: false },
     { id: 4, blueDiamonds: 19998, tonAmount: 99.99, popular: false }
   ]);
-  const [loadingBlueOptions, setLoadingBlueOptions] = useState(false);
+  const [loadingBlueOptions] = useState(false);
 
   // Function to get plan name from level
-  const getPlanName = (level) => {
-    switch (level) {
-      case 0: return 'Free';
-      case 1: return 'Tortoise';
-      case 2: return 'Rabbit';
-      case 3: return 'Car';
-      case 4: return 'Rocket';
-      case 5: return 'UFO';
-      case 6: return 'Lightspeed';
-      default: return 'Free';
-    }
-  };
-
   // Function to get icon based on active tab
   const getTabIcon = (tab) => {
     switch (tab) {
@@ -202,37 +171,6 @@ function MiningPage({ telegramUser }) {
   };
 
   // Function to format TON prices to avoid scientific notation
-  const formatTONPrice = (price) => {
-    if (price === 0) return '0';
-    // Convert to string and remove trailing zeros after decimal point
-    const priceStr = price.toString();
-    if (priceStr.includes('.')) {
-      return priceStr.replace(/\.?0+$/, ''); // Remove trailing zeros after decimal
-    }
-    return priceStr;
-  };
-
-  useEffect(() => {
-    if (!socket || !telegramUser) return;
-    if (activeTab !== 'shop') return;
-    
-    setLoadingPlans(true);
-    setShopError(null);
-    console.log('🔄 MiningPage: Requesting mining plans for user:', telegramUser.id);
-    socket.emit('mining:getPlans', { telegramId: telegramUser.id }, (res) => {
-      if (!res?.success) {
-        console.log('❌ MiningPage: Failed to get plans:', res?.error);
-        setShopError(res?.error || 'Failed to load plans');
-      } else {
-        console.log('✅ MiningPage: Successfully loaded plans:', res.plans?.length || 0);
-        setPlans(res.plans || []);
-        setCurrentLevel(res.currentLevel || 0);
-        setBoostMultiplier(res.boostMultiplier || 1);
-      }
-      setLoadingPlans(false);
-    });
-  }, [socket, telegramUser, activeTab]);
-
   // Load White Diamond balance and options when topup tab is active
   useEffect(() => {
     if (!socket || !telegramUser) return;
@@ -254,10 +192,12 @@ function MiningPage({ telegramUser }) {
     });
 
     // Load White Diamond purchase options (optional - we have fallback)
+    setLoadingOptions(true);
     socket.emit('diamonds:getOptions', {}, (res) => {
       if (res?.success && res.options?.length > 0) {
         setWhiteDiamondOptions(res.options);
       }
+      setLoadingOptions(false);
       // Keep the default options if backend fails
     });
   }, [socket, telegramUser, activeTab]);

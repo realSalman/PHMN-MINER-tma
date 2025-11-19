@@ -83,58 +83,13 @@ function AppContent() {
   }
 
   // Add notification helper
-  const addNotification = (notification) => {
+  const addNotification = useCallback((notification) => {
     const id = Date.now();
     setNotifications(prev => [...prev, { ...notification, id }]);
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, notification.duration || 5000);
-  };
-
-  // Handle accepting invitation
-  const handleAcceptInvitation = () => {
-    if (!socket || !invitationReceived) return;
-    const telegramId = getAccountData('telegramId');
-    const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    
-    console.log('🎯 Accepting invitation to room:', invitationReceived.roomId);
-    
-    // Store room name and roomId in account-specific storage
-    setAccountData('roomName', invitationReceived.roomName || 'Game Lobby');
-    setAccountData('roomId', invitationReceived.roomId);
-    
-    // Store invitation data for LudoApp to handle
-    setAccountData('pendingInvitation', {
-      roomId: invitationReceived.roomId,
-      roomName: invitationReceived.roomName || 'Game Lobby',
-      accepted: true
-    });
-    
-    setInvitationReceived(null);
-    addNotification({ type: 'success', message: 'Joining the game lobby!', duration: 3000 });
-    
-    // Navigate to the classic route
-    window.location.href = `/play/classic`;
-  };
-
-  // Handle rejecting invitation
-  const handleRejectInvitation = () => {
-    if (!socket || !invitationReceived) return;
-    const telegramId = localStorage.getItem('telegramId');
-    const telegramUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-    
-    console.log('❌ Rejecting invitation to room:', invitationReceived.roomId);
-    socket.emit('lobby:rejectInvitation', { 
-      roomId: invitationReceived.roomId, 
-      invitedUser: { 
-        telegramId: telegramId, 
-        first_name: telegramUser?.first_name, 
-        last_name: telegramUser?.last_name 
-      } 
-    });
-    setInvitationReceived(null);
-    addNotification({ type: 'info', message: 'Invitation declined', duration: 3000 });
-  };
+  }, []);
 
 
 
@@ -292,7 +247,7 @@ function AppContent() {
       clearTimeout(connectionTimeout);
       newSocket.close();
     };
-  }, []);
+  }, [user, addNotification]);
 
   // Initialize Telegram WebApp
   useEffect(() => {
@@ -449,7 +404,7 @@ function AppContent() {
     }, 10000);
 
     return () => clearTimeout(timeout);
-  }, [socket]);
+  }, [socket, isInitializing, addNotification]);
 
   // Ensure user data is saved once both socket and Telegram user are ready
   useEffect(() => {
@@ -520,7 +475,7 @@ function AppContent() {
         console.error('❌ Failed to emit user:save:', e);
       }
     }
-  }, [socket, user]);
+  }, [socket, user, addNotification]);
 
   // Persist basic user identity locally for name fallback
   useEffect(() => {
@@ -563,7 +518,7 @@ function AppContent() {
         socket.off('friends:autoAdded');
       };
     }
-  }, [socket, user]);
+  }, [socket, user, addNotification]);
 
   // Handle invitation dialog actions
   const handleInvitationAccept = () => {

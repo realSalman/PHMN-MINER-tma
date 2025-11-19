@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { SocketContext } from '../App';
 import minerImg from '../images/main-icon.png';
 import phmnCoinImg from '../images/PHMN coin.png';
@@ -11,9 +10,7 @@ import backgImg from '../images/backg.png';
 
 function Play() {
   const [user, setUser] = useState(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const [balance, setBalance] = useState(0);
-  const [floatingLabels, setFloatingLabels] = useState([]);
   const [miningState, setMiningState] = useState('idle'); // 'idle', 'active', 'completed'
   const [remainingTime, setRemainingTime] = useState(0);
   const [miningRate, setMiningRate] = useState(100); // PHMN per hour
@@ -24,8 +21,6 @@ function Play() {
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState('');
   const [timezoneSearch, setTimezoneSearch] = useState('');
-  const location = useLocation();
-  const navigate = useNavigate();
   const appSocket = useContext(SocketContext);
   
   // All major timezones of the world (40+ timezones)
@@ -180,29 +175,6 @@ function Play() {
     initializeTelegram();
   }, [appSocket]);
 
-
-  // Floating +10 animation lifecycle
-  useEffect(() => {
-    if (floatingLabels.length === 0) return;
-    const timers = floatingLabels.map((item) =>
-      setTimeout(() => {
-        setFloatingLabels((prev) => prev.filter((f) => f.id !== item.id));
-      }, 900)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [floatingLabels]);
-
-  const handleTap = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX ?? 0) - rect.left;
-    const y = (e.clientY ?? 0) - rect.top;
-
-    setBalance((prev) => prev + 10);
-    setFloatingLabels((prev) => [
-      ...prev,
-      { id: Date.now() + Math.random(), x, y, value: '+10' },
-    ]);
-  };
 
   // Load mining session status on mount and when socket/user is ready
   useEffect(() => {

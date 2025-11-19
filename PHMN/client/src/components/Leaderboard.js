@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { SocketContext } from '../App';
 import cupIcon from '../images/cup.png';
@@ -16,18 +16,6 @@ function Leaderboard({ telegramUser }) {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
-      transition: {
-        duration: 0.4,
-        ease: [0.4, 0, 0.2, 1]
-      }
-    }
-  };
-
-  const headerVariants = {
-    hidden: { opacity: 0, y: -20 },
-    visible: {
-      opacity: 1,
-      y: 0,
       transition: {
         duration: 0.4,
         ease: [0.4, 0, 0.2, 1]
@@ -96,24 +84,22 @@ function Leaderboard({ telegramUser }) {
   };
 
   // Fetch leaderboard data
-  const fetchLeaderboard = async () => {
-    setLoading(true);
-    setError(null); // Clear previous errors
-    
-    try {
-      console.log('Fetching leaderboard data...');
-      // Use Socket.IO like other components
-      if (socket) {
-        socket.emit('leaderboard:getData');
-      } else {
-        throw new Error('Socket not connected');
-      }
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error);
-      setError(error.message || 'Failed to load leaderboard data');
-      setLoading(false);
+const fetchLeaderboard = useCallback(() => {
+  setLoading(true);
+  setError(null);
+
+  try {
+    if (socket) {
+      socket.emit('leaderboard:getData');
+    } else {
+      throw new Error('Socket not connected');
     }
-  };
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    setError(error.message || 'Failed to load leaderboard data');
+    setLoading(false);
+  }
+}, [socket]);
 
   // Listen for leaderboard data
   useEffect(() => {
@@ -136,7 +122,7 @@ function Leaderboard({ telegramUser }) {
     return () => {
       socket.off('leaderboard:data', handleLeaderboardData);
     };
-  }, [socket]);
+}, [socket, fetchLeaderboard]);
 
   // Refresh leaderboard after user data is saved (ensures names are up to date)
   useEffect(() => {
@@ -150,14 +136,14 @@ function Leaderboard({ telegramUser }) {
 
     socket.on('user:saved', handleUserSaved);
     return () => socket.off('user:saved', handleUserSaved);
-  }, [socket]);
+}, [socket, fetchLeaderboard]);
 
   // Fetch leaderboard when tab is switched to leaderboard
   useEffect(() => {
     if (activeTab === 'leaderboard' && !leaderboardData) {
       fetchLeaderboard();
     }
-  }, [activeTab, leaderboardData]);
+  }, [activeTab, leaderboardData, fetchLeaderboard]);
 
   // Get all players
   const getFilteredPlayers = () => {
