@@ -16,9 +16,9 @@ const socketManager = {
 
         this.io = new Server(server, {
             cors: {
-                origin: ["http://localhost:3000", process.env.GAME_URL || "https://app.phoneminer.org"],
+                origin: ["https://app.phoneminer.org", process.env.GAME_URL],
                 credentials: true,
-            },            
+            },
             allowRequest: (req, callback) => {
                 const fakeRes = {
                     getHeader() { return []; },
