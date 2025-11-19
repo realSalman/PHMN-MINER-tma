@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-export const socket = io(process.env.GAME_URL || "https://api.phoneminer.org/", {
+export const socket = io(process.env.GAME_URL || "https://api.phoneminer.org", {
   path: "/socket.io",
   transports: ["websocket", "polling"],
   upgrade: true,
