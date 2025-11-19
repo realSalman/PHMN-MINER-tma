@@ -18,7 +18,6 @@ function MiningPage({ telegramUser }) {
     error: walletError, 
     connect, 
     disconnect, 
-    sendPayment,
     tonConnectUI 
   } = useTonConnect();
 
@@ -340,46 +339,6 @@ function MiningPage({ telegramUser }) {
       socket.off('exchange:failed', handleExchangeFailed);
     };
   }, [socket, telegramUser]);
-
-  const handleBuyPlan = async (level) => {
-    if (!socket || !telegramUser) return;
-    
-    setShopError(null);
-    
-    // Check if wallet is connected
-    if (!connected) {
-      setShopError('Please connect your TON wallet first');
-      return;
-    }
-    
-    try {
-      // Send TON payment
-      const result = await sendPayment(level);
-      
-      if (result.success) {
-        // Activate plan on server after successful payment
-        socket.emit('ton:activatePlan', { 
-          telegramId: telegramUser.id, 
-          planLevel: level, 
-          transactionHash: result.boc 
-        }, (res) => {
-          if (res.success) {
-            console.log('✅ MiningPage: Plan activation successful, updating state and refreshing stats');
-            setCurrentLevel(res.plan.level);
-            setBoostMultiplier(res.plan.boost);
-            setShopError(null);
-          } else {
-            console.log('❌ MiningPage: Plan activation failed:', res.error);
-            setShopError(res.error || 'Failed to activate plan');
-          }
-        });
-      } else {
-        setShopError('Payment failed');
-      }
-    } catch (error) {
-      setShopError('Payment error: ' + error.message);
-    }
-  };
 
   const handleBuyWhiteDiamonds = async (option) => {
     if (!socket || !telegramUser) return;

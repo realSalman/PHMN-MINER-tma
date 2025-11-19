@@ -331,8 +331,13 @@ const claimTaskReward = useCallback((taskId, additionalData = {}) => {
   const useReferralCode = () => {
     if (!socket || !telegramUser || !referralInput.trim()) return;
     socket.emit('referral:useCode', { telegramId: telegramUser.id, referralCode: referralInput.trim() }, (res) => {
-      if (res?.success) { showNotification(`Code applied! Referred by ${res.referrerName}`); setReferralInput(''); setShowReferralModal(false); loadReferralStats(); }
-      else showNotification(res?.error || 'Failed to use code', 'error');
+      if (res?.success) {
+        showNotification(`Code applied! Referred by ${res.referrerName}`);
+        setReferralInput('');
+        loadReferralStats();
+      } else {
+        showNotification(res?.error || 'Failed to use code', 'error');
+      }
     });
   };
 
