@@ -145,7 +145,7 @@ server.listen(PORT, () => {
 const botToken = process.env.BOT_TOKEN;
 const botUsername = process.env.BOT_USERNAME;
 const gameUrl = process.env.GAME_URL;
-const enableMiniApp = process.env.ENABLE_MINI_APP === 'true';
+const enableMiniApp = 'true';
 const referralCodeStore = new Map();
 
 // Export for use in other modules

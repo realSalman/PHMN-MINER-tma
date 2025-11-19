@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 
-export const socket = io(process.env.REACT_APP_SOCKET_URL || "http://localhost:3001", {
+export const socket = io(process.env.GAME_URL || "http://localhost:3001", {
   path: "/socket.io",
   transports: ["websocket", "polling"],
   upgrade: true,

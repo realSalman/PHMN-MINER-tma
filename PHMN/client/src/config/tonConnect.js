@@ -3,17 +3,17 @@
 
 // TON Connect manifest for your Mini App
 export const manifest = {
-  url: process.env.REACT_APP_GAME_URL || 'https://64.hexterminator.xyz',
+  url: process.env.GAME_URL || 'https://64.hexterminator.xyz',
   name: 'Ludo Game',
-  iconUrl: `${process.env.REACT_APP_GAME_URL || 'https://64.hexterminator.xyz'}/logo192.png`,
-  termsOfUseUrl: `${process.env.REACT_APP_GAME_URL || 'https://64.hexterminator.xyz'}/terms`,
-  privacyPolicyUrl: `${process.env.REACT_APP_GAME_URL || 'https://64.hexterminator.xyz'}/privacy`,
+  iconUrl: `${process.env.GAME_URL || 'https://64.hexterminator.xyz'}/logo192.png`,
+  termsOfUseUrl: `${process.env.GAME_URL || 'https://64.hexterminator.xyz'}/terms`,
+  privacyPolicyUrl: `${process.env.GAME_URL || 'https://64.hexterminator.xyz'}/privacy`,
   features: ['ton_addr', 'ton_proof'],
   items: ['ton_addr', 'ton_proof']
 };
 
 // wallet address for receiving payments
-export const MERCHANT_WALLET = process.env.REACT_APP_MERCHANT_WALLET;
+export const SERVER_WALLET_ADDRESS = process.env.SERVER_WALLET_ADDRESS;
 
 // Mining plan prices in TON
 export const MINING_PLAN_PRICES = {

@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { SocketContext } from '../App';
 import { useTonConnect } from '../hooks/useTonConnect';
-import { MINING_PLAN_PRICES, MERCHANT_WALLET } from '../config/tonConnect';
+import { MINING_PLAN_PRICES, SERVER_WALLET_ADDRESS } from '../config/tonConnect';
 import { toUserFriendlyAddress } from '@tonconnect/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import tonIcon from '../images/ton.svg';
@@ -505,8 +505,8 @@ function MiningPage({ telegramUser }) {
       console.log(`💎 Sending payment for White Diamonds: ${tonAmount} TON`);
       console.log('💎 Wallet address:', wallet.address);
       
-      // Use the imported MERCHANT_WALLET constant instead of process.env
-      const merchantWallet = MERCHANT_WALLET;
+      // Use the imported SERVER_WALLET_ADDRESS constant instead of process.env
+      const merchantWallet = SERVER_WALLET_ADDRESS;
       console.log('💎 Merchant wallet:', merchantWallet);
       
       if (!merchantWallet) {

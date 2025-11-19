@@ -27,8 +27,6 @@ mongoose.connection.on('reconnected', () => {
 
 // Advanced connection pooling configuration for 1M+ users
 const connectionOptions = {
-  dbName: 'ludo_game',
-  
   // Connection Pool Settings
   maxPoolSize: 100,           // Maximum connections in pool (increased for high load)
   minPoolSize: 20,            // Minimum connections to keep ready

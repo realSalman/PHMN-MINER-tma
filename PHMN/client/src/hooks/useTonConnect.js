@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { MERCHANT_WALLET, MINING_PLAN_PRICES } from '../config/tonConnect';
+import { SERVER_WALLET_ADDRESS, MINING_PLAN_PRICES } from '../config/tonConnect';
 
 export const useTonConnect = () => {
   const [tonConnectUI] = useTonConnectUI();
@@ -87,7 +87,7 @@ export const useTonConnect = () => {
         validUntil: Math.floor(Date.now() / 1000) + 600,
         messages: [
           {
-            address: MERCHANT_WALLET,
+            address: SERVER_WALLET_ADDRESS,
             amount: (amount * 1000000000).toString()
           }
         ]
