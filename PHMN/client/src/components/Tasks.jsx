@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { SocketContext } from '../App';
 import tasksImg from '../images/tasks.png';
@@ -14,6 +14,7 @@ const Tasks = ({ telegramUser, botUsername }) => {
   const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  const notificationTimeoutRef = useRef(null);
   const [gameStats, setGameStats] = useState(null);
   const [referralCode, setReferralCode] = useState('');
   const [referralStats, setReferralStats] = useState(null);
@@ -35,10 +36,24 @@ const Tasks = ({ telegramUser, botUsername }) => {
     { id: 'referrals', label: 'Friends', icon: '👥' }
   ];
 
-  const showNotification = (message, type = 'success') => {
+  const showNotification = useCallback((message, type = 'success') => {
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+    }
     setNotification({ show: true, message, type });
-    setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 3000);
-  };
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'success' });
+      notificationTimeoutRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+    };
+  }, []);
 
 const loadBotUsername = useCallback(() => {
     if (!socket) return;
@@ -305,30 +320,7 @@ const claimTaskReward = useCallback((taskId, additionalData = {}) => {
     }
   };
 
-  const openReferralLink = (code) => {
-    const referralLink = `https://t.me/${botUsernameState}?start=${code}`;
-    
-    // Check if we're in Telegram Mini App
-    if (window.Telegram && window.Telegram.WebApp) {
-      try {
-        // Show a message first
-        showNotification('Opening referral link...', 'success');
-        
-        // Use Telegram's method to open the link
-        window.Telegram.WebApp.openTelegramLink(referralLink);
-      } catch (error) {
-        // Fallback to regular method if Telegram method fails
-        showNotification('Referral link opened!', 'success');
-        window.open(referralLink, '_blank');
-      }
-    } else {
-      // Fallback for non-Telegram environments
-      window.open(referralLink, '_blank');
-      showNotification('Referral link opened!', 'success');
-    }
-  };
-
-  const useReferralCode = () => {
+  const handleUseReferralCode = () => {
     if (!socket || !telegramUser || !referralInput.trim()) return;
     socket.emit('referral:useCode', { telegramId: telegramUser.id, referralCode: referralInput.trim() }, (res) => {
       if (res?.success) {
@@ -436,219 +428,228 @@ const claimTaskReward = useCallback((taskId, additionalData = {}) => {
     
     return (
       <div className="space-y-3">
-        {tasks.map((task) => (
-          <motion.div 
-            key={task.id} 
-            className={`rounded-xl p-4 transition-all duration-200 ${
-              task.completed
-                ? 'bg-[#2a1f3d]/80 border border-gray-700/40'
-                : 'bg-[#2a1f3d] border border-gray-700/40'
-            }`} 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <div className={`flex items-center justify-between ${!isTaskClaimable(task) && task.id !== 'join_channel' && task.id !== 'follow_x' && task.id !== 'subscribe_youtube' && task.id !== 'follow_instagram' ? 'opacity-60' : ''}`}>
-              <div className="flex items-center gap-4 flex-1">
-                <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center">
-                  {getTaskIcon(task.id) ? (
-                    <img 
-                      src={getTaskIcon(task.id)} 
-                      alt={task.title} 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <span className="text-3xl">{task.icon || '📋'}</span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-base font-semibold text-white mb-1">{task.title}</h3>
-                  <div className="text-sm text-gray-400 font-medium">+{getTaskEnergyReward(task).toLocaleString()} Energy</div>
-                  {task.target > 1 && (
-                    <div className="text-xs text-gray-400 mt-2">
-                      <span>{getTaskProgress(task)}/{task.target}</span>
-                      <div className="w-full bg-gray-700 rounded-full h-1.5 mt-1">
-                        <div className="bg-gradient-to-r from-gray-500 to-gray-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${Math.min((getTaskProgress(task) / task.target) * 100, 100)}%` }}></div>
+        {tasks.map((task) => {
+          const taskIsCompleted = isTaskCompleted(task);
+          const taskIsClaimable = isTaskClaimable(task);
+          const isJoinTask = task.id === 'join_channel';
+          const isFollowXTask = task.id === 'follow_x';
+          const isYoutubeTask = task.id === 'subscribe_youtube';
+          const isInstagramTask = task.id === 'follow_instagram';
+
+          return (
+            <motion.div 
+              key={task.id} 
+              className={`rounded-xl p-4 transition-all duration-200 ${
+                taskIsCompleted
+                  ? 'bg-[#2a1f3d]/80 border border-gray-700/40'
+                  : 'bg-[#2a1f3d] border border-gray-700/40'
+              }`} 
+              initial={{ opacity: 0, y: 10 }} 
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className={`flex items-center justify-between ${!taskIsClaimable && !isJoinTask && !isFollowXTask && !isYoutubeTask && !isInstagramTask ? 'opacity-60' : ''}`}>
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center">
+                    {getTaskIcon(task.id) ? (
+                      <img 
+                        src={getTaskIcon(task.id)} 
+                        alt={task.title} 
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-3xl">{task.icon || '📋'}</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-white mb-1">{task.title}</h3>
+                    <div className="text-sm text-gray-400 font-medium">+{getTaskEnergyReward(task).toLocaleString()} Energy</div>
+                    {task.target > 1 && (
+                      <div className="text-xs text-gray-400 mt-2">
+                        <span>{getTaskProgress(task)}/{task.target}</span>
+                        <div className="w-full bg-gray-700 rounded-full h-1.5 mt-1">
+                          <div className="bg-gradient-to-r from-gray-500 to-gray-500 h-1.5 rounded-full transition-all duration-300" style={{ width: `${Math.min((getTaskProgress(task) / task.target) * 100, 100)}%` }}></div>
+                        </div>
                       </div>
-                    </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-shrink-0 ml-3">
+                  {taskIsCompleted ? (
+                    <motion.button 
+                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-gray-500 to-gray-600 flex items-center justify-center gap-2 shadow-lg font-medium min-w-[100px]"
+                      whileHover={{ scale: 1.05 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <span>✓</span>
+                      <span>Claimed</span>
+                    </motion.button>
+                  ) : isJoinTask ? (
+                    buttonStates.join_channel === 'join' ? (
+                      <motion.button 
+                        onClick={() => handleChannelJoin(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    ) : (
+                      <motion.button 
+                        onClick={() => handleChannelVerification(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    )
+                  ) : isFollowXTask ? (
+                    buttonStates.follow_x === 'follow' ? (
+                      <motion.button 
+                        onClick={() => handleXFollow(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    ) : (
+                      <motion.button 
+                        onClick={() => handleXFollowVerification(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    )
+                  ) : isYoutubeTask ? (
+                    buttonStates.subscribe_youtube === 'subscribe' ? (
+                      <motion.button 
+                        onClick={() => handleYouTubeSubscribe(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    ) : (
+                      <motion.button 
+                        onClick={() => handleYouTubeSubscribeVerification(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    )
+                  ) : isInstagramTask ? (
+                    buttonStates.follow_instagram === 'follow' ? (
+                      <motion.button 
+                        onClick={() => handleInstagramFollow(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    ) : (
+                      <motion.button 
+                        onClick={() => handleInstagramFollowVerification(task)}
+                        className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                      >
+                        <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                        <span>200</span>
+                      </motion.button>
+                    )
+                  ) : taskIsClaimable ? (
+                    <motion.button 
+                      onClick={() => claimTaskReward(task.id)}
+                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <img
+                          src={phmnCoinImg}
+                          alt="PHMN Coin"
+                          className="w-6 h-6 select-none"
+                          draggable="false"
+                        />
+                      <span>200</span>
+                    </motion.button>
+                  ) : (
+                    <motion.div 
+                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 flex items-center justify-center gap-2 shadow-lg font-medium min-w-[100px]"
+                      whileHover={{ scale: 1.02 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <span>✗</span>
+                      <span>Locked</span>
+                    </motion.div>
                   )}
                 </div>
               </div>
-              <div className="flex-shrink-0 ml-3">
-                {task.completed ? (
-                  <motion.button 
-                    className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-gray-500 to-gray-600 flex items-center justify-center gap-2 shadow-lg font-medium min-w-[100px]"
-                    whileHover={{ scale: 1.05 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <span>✓</span>
-                    <span>Claimed</span>
-                  </motion.button>
-                ) : task.id === 'join_channel' && !task.completed ? (
-                  buttonStates.join_channel === 'join' ? (
-                    <motion.button 
-                      onClick={() => handleChannelJoin(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  ) : (
-                    <motion.button 
-                      onClick={() => handleChannelVerification(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  )
-                ) : task.id === 'follow_x' && !task.completed ? (
-                  buttonStates.follow_x === 'follow' ? (
-                    <motion.button 
-                      onClick={() => handleXFollow(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  ) : (
-                    <motion.button 
-                      onClick={() => handleXFollowVerification(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  )
-                ) : task.id === 'subscribe_youtube' && !task.completed ? (
-                  buttonStates.subscribe_youtube === 'subscribe' ? (
-                    <motion.button 
-                      onClick={() => handleYouTubeSubscribe(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  ) : (
-                    <motion.button 
-                      onClick={() => handleYouTubeSubscribeVerification(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  )
-                ) : task.id === 'follow_instagram' && !task.completed ? (
-                  buttonStates.follow_instagram === 'follow' ? (
-                    <motion.button 
-                      onClick={() => handleInstagramFollow(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  ) : (
-                    <motion.button 
-                      onClick={() => handleInstagramFollowVerification(task)}
-                      className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                    >
-                      <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                      <span>200</span>
-                    </motion.button>
-                  )
-                ) : isTaskClaimable(task) ? (
-                  <motion.button 
-                    onClick={() => claimTaskReward(task.id)}
-                    className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-purple-700 flex items-center justify-center gap-2 shadow-lg font-medium cursor-pointer hover:from-purple-700 hover:to-purple-800 min-w-[100px]"
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <img
-                        src={phmnCoinImg}
-                        alt="PHMN Coin"
-                        className="w-6 h-6 select-none"
-                        draggable="false"
-                      />
-                    <span>200</span>
-                  </motion.button>
-                ) : (
-                  <motion.div 
-                    className="text-white text-sm px-4 py-2.5 rounded-lg bg-gradient-to-r from-gray-600 to-gray-700 flex items-center justify-center gap-2 shadow-lg font-medium min-w-[100px]"
-                    whileHover={{ scale: 1.02 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <span>✗</span>
-                    <span>Locked</span>
-                  </motion.div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
     );
   };
@@ -723,6 +724,29 @@ const claimTaskReward = useCallback((taskId, additionalData = {}) => {
             )}
           </motion.div>
         )}
+
+        <motion.div className="rounded-lg p-3 border border-gray-700/40" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <h3 className="text-sm font-semibold text-white mb-2">Have a referral code?</h3>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={referralInput}
+              onChange={(e) => setReferralInput(e.target.value)}
+              placeholder="Enter friend's code"
+              className="flex-1 bg-gray-900/60 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+            />
+            <motion.button
+              onClick={handleUseReferralCode}
+              disabled={!referralInput.trim()}
+              className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              whileHover={!referralInput.trim() ? {} : { scale: 1.05, y: -2 }}
+              whileTap={!referralInput.trim() ? {} : { scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+            >
+              Apply Code
+            </motion.button>
+          </div>
+        </motion.div>
       </div>
     );
   };

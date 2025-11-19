@@ -1,8 +1,7 @@
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { SocketContext } from '../App';
 import { useTonConnect } from '../hooks/useTonConnect';
-import { toUserFriendlyAddress } from '@tonconnect/sdk';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import phmnCoinImg from '../images/PHMN coin.png';
 import walletIconImg from '../images/wallet icon.png';
 import arrowImg from '../images/arrow.png';
@@ -10,23 +9,11 @@ import arrowImg from '../images/arrow.png';
 
 function Wallet({ telegramUser }) {
   const [balanceInfo, setBalanceInfo] = useState(null);
-  const [piecesToConvert, setPiecesToConvert] = useState(0);
-  const [converting, setConverting] = useState(false);
-  const [showConversionOverlay, setShowConversionOverlay] = useState(false);
-  const [conversionMessage, setConversionMessage] = useState('');
-  const [conversionType, setConversionType] = useState('success'); // 'success' or 'error'
 
   const socket = useContext(SocketContext);
   
-  // Global mining statistics for all users
-  const [globalStats, setGlobalStats] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [statsError, setStatsError] = useState(null);
-  
   // Add TON wallet connection hook
   const { 
-    wallet, 
     connected, 
     loading: walletLoading, 
     error: walletError, 
@@ -43,18 +30,6 @@ function Wallet({ telegramUser }) {
   const [referralLoading, setReferralLoading] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [botUsername, setBotUsername] = useState('');
-
-  // Add callback for refreshing mining stats
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  const refreshMiningStats = () => {
-    console.log('🔄 Wallet: refreshMiningStats called, incrementing refreshTrigger from', refreshTrigger);
-    // Add a small delay to ensure server has processed the database update
-    setTimeout(() => {
-      setRefreshTrigger(prev => prev + 1);
-      console.log('🔄 Wallet: refreshTrigger updated to', refreshTrigger + 1);
-    }, 500); // 500ms delay
-  };
 
   // Fetch user data on component mount
   useEffect(() => {
@@ -219,7 +194,7 @@ function Wallet({ telegramUser }) {
       isMounted = false;
       clearInterval(balanceInterval);
     };
-  }, [socket, telegramUser?.id, refreshTrigger]);
+  }, [socket, telegramUser?.id]);
 
   const phmnBalance = useMemo(() => {
     const rawValue =
@@ -494,60 +469,6 @@ function Wallet({ telegramUser }) {
         </div>
       </div>
       
-      {/* Conversion Overlay */}
-      <AnimatePresence>
-        {showConversionOverlay && (
-          <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <motion.div
-              className={`max-w-sm w-full rounded-xl p-6 shadow-2xl border ${
-                conversionType === 'success' 
-                  ? 'bg-gradient-to-br from-green-500/20 to-green-600/20 border-green-500/30' 
-                  : 'bg-gradient-to-br from-red-500/20 to-red-600/20 border-red-500/30'
-              }`}
-              initial={{ scale: 0.8, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0, y: 20 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            >
-              <div className="text-center">
-                <div className={`text-4xl mb-4 ${
-                  conversionType === 'success' ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  {conversionType === 'success' ? '✅' : '❌'}
-                </div>
-                <h3 className={`text-lg font-bold mb-2 ${
-                  conversionType === 'success' ? 'text-green-400' : 'text-red-400'
-                }`}>
-                  {conversionType === 'success' ? 'Conversion Successful!' : 'Conversion Failed'}
-                </h3>
-                <p className="text-sm text-gray-300 mb-6 leading-relaxed">
-                  {conversionMessage}
-                </p>
-                <motion.button
-                  onClick={() => setShowConversionOverlay(false)}
-                  className={`px-6 py-2 rounded-lg font-medium transition-all duration-200 ${
-                    conversionType === 'success'
-                      ? 'bg-green-500 hover:bg-green-600 text-white'
-                      : 'bg-red-500 hover:bg-red-600 text-white'
-                  }`}
-                  whileHover={{ scale: 1.05, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  OK
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
     </motion.div>
   );
 }

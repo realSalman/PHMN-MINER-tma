@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useContext } from 'react';
 import { useTonConnect } from '../hooks/useTonConnect';
-import { toUserFriendlyAddress } from '@tonconnect/sdk';
 import { SocketContext } from '../App';
 
 const TonConnectTest = ({ telegramUser }) => {

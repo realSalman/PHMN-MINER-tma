@@ -1,20 +1,11 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { SocketContext } from '../App';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import upgradeImg from '../images/upgrade.png';
-import maxEnergyImg from '../images/max energy.png';
 import phmnCoinImg from '../images/PHMN coin.png';
-import renewableEnergyImg from '../images/renewable energy .png';
 import tasksImg from '../images/tasks.png';
 
-function Upgrade({ telegramUser }) {
-  const socket = useContext(SocketContext);
+function Upgrade() {
   const [activeMiningMode, setActiveMiningMode] = useState('basic');
-  const [maxEnergyLevel, setMaxEnergyLevel] = useState(5);
-  const [maxEnergyValue, setMaxEnergyValue] = useState(8500);
-  const [restoreEnergyRate, setRestoreEnergyRate] = useState(100);
-  const [restoreEnergyMultiplier, setRestoreEnergyMultiplier] = useState(2);
-  const [restoreTimeRemaining, setRestoreTimeRemaining] = useState('4hrs');
   const [claimCards, setClaimCards] = useState([
     { id: 1, amount: 5000, claimed: false },
     { id: 2, amount: 10000, claimed: false },
@@ -36,16 +27,6 @@ function Upgrade({ telegramUser }) {
     setClaimCards(prev => prev.map(card => 
       card.id === cardId ? { ...card, claimed: true } : card
     ));
-  };
-
-  const handleUpgradeMaxEnergy = () => {
-    // Handle max energy upgrade
-    console.log('Upgrade Max Energy');
-  };
-
-  const handleRestoreEnergy = () => {
-    // Handle restore energy
-    console.log('Restore Energy');
   };
 
   return (

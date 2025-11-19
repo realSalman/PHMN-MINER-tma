@@ -141,15 +141,9 @@ export const useTonConnect = () => {
       return 0;
     }
 
-    try {
-      // Note: The UI provider doesn't directly expose balance
-      // You might need to use a separate API call to get balance
-      // For now, return 0 and implement balance fetching separately
-      return 0;
-    } catch (err) {
-      console.error('Failed to get balance:', err);
-      return 0;
-    }
+    // The TON Connect UI provider does not expose a direct balance query.
+    // Integrate a separate API or toncenter call here when available.
+    return 0;
   }, [connected, wallet]);
 
   // Get available wallets - not needed with UI provider
