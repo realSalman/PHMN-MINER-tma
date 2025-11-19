@@ -1,6 +1,7 @@
 require('dotenv').config({ path: __dirname + '/.env' });
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const socketManager = require('./socket/socketManager');
 const mongoose = require('./config/database'); // exports connected mongoose instance
 const { connectToDatabase } = require('./config/database'); // Get the connect function
@@ -116,6 +117,11 @@ app.get('/api/test', (req, res) => {
   });
 });
 
+// Serve React app for all non-API routes
+app.get(/^\/(?!api|socket\.io).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
 // Create HTTP server
 const server = http.createServer(app);
 
@@ -145,8 +151,13 @@ server.listen(PORT, () => {
 const botToken = process.env.BOT_TOKEN;
 const botUsername = process.env.BOT_USERNAME;
 const gameUrl = process.env.GAME_URL;
-const enableMiniApp = 'true';
+const enableMiniApp = process.env.ENABLE_MINI_APP === 'true';
 const referralCodeStore = new Map();
+const miniAppEnabled = enableMiniApp && !!gameUrl;
+
+if (enableMiniApp && !gameUrl) {
+  console.warn('⚠️ ENABLE_MINI_APP is true but GAME_URL is not set. Mini App buttons will be disabled until GAME_URL is configured.');
+}
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
@@ -162,18 +173,46 @@ if (!botToken || botToken === 'your_bot_token_here' || botToken === '') {
     
     console.log('🤖 Telegram Bot starting...');
     console.log(`📱 Bot username: @${botUsername}`);
-    console.log(`🎮 Game URL: ${gameUrl}`);
-    console.log(`📱 Mini App mode: ${enableMiniApp ? 'Enabled' : 'Disabled'}`);
+    console.log(`🎮 Game URL: ${gameUrl || 'not configured'}`);
+    console.log(`📱 Mini App mode: ${miniAppEnabled ? 'Enabled' : 'Disabled'}`);
 
-    if (enableMiniApp) {
+    const ensureGameUrlConfigured = async (chatId) => {
+      if (gameUrl) {
+        return true;
+      }
+
+      await bot.sendMessage(chatId, '⚠️ The game link is not configured yet. Please try again later.');
+      return false;
+    };
+
+    const buildLaunchButton = (text, referralCode) => {
+      const targetUrl = referralCode ? `${gameUrl}?start=${referralCode}` : gameUrl;
+      if (miniAppEnabled) {
+        return {
+          text,
+          web_app: { url: targetUrl }
+        };
+      }
+
+      return {
+        text,
+        url: targetUrl
+      };
+    };
+
+    if (miniAppEnabled) {
       // Mini App mode - simplified bot for referral links only
       bot.onText(/\/start(.+)?/, async (msg, match) => {
         const chatId = msg.chat.id;
         const startParam = match ? match[1] : null;
+        const referralCode = startParam && startParam.trim() ? startParam.trim() : null;
 
-        if (startParam && startParam.trim()) {
+        if (!(await ensureGameUrlConfigured(chatId))) {
+          return;
+        }
+
+        if (referralCode) {
           // Referral link - redirect to Mini App with referral code
-          const referralCode = startParam.trim();
           console.log(`🎯 Referral link accessed with code: ${referralCode}`);
           
           // Store the referral code for this user (valid for 1 hour)
@@ -184,15 +223,9 @@ if (!botToken || botToken === 'your_bot_token_here' || botToken === '') {
           });
           
           const welcomeText = `🎮 Welcome to  PHMN CHAD BOT!\n\n🎲 You were invited by a friend!\n\n🎁 Click the "Open Game" button below to start playing and earn rewards!\n\n💡 Tip: Use the button below for the best experience!`;
-          
           const keyboard = {
             inline_keyboard: [[
-              {
-                text: '🎮 Open Game',
-                web_app: {
-                  url: `${gameUrl}?start=${referralCode}`
-                }
-              }
+              buildLaunchButton('🎮 Open Game', referralCode)
             ]]
           };
 
@@ -205,12 +238,7 @@ if (!botToken || botToken === 'your_bot_token_here' || botToken === '') {
 
           const keyboard = {
             inline_keyboard: [[
-              {
-                text: '🎮 Open Game',
-                web_app: {
-                  url: gameUrl
-                }
-              }
+              buildLaunchButton('🎮 Open Game')
             ]]
           };
 
@@ -233,10 +261,14 @@ if (!botToken || botToken === 'your_bot_token_here' || botToken === '') {
       bot.onText(/\/start(.+)?/, async (msg, match) => {
         const chatId = msg.chat.id;
         const startParam = match ? match[1] : null;
+        const referralCode = startParam && startParam.trim() ? startParam.trim() : null;
+
+        if (!(await ensureGameUrlConfigured(chatId))) {
+          return;
+        }
 
         // Check if this is a referral link
-        if (startParam && startParam.trim()) {
-          const referralCode = startParam.trim();
+        if (referralCode) {
           console.log(`🎯 Referral link accessed with code: ${referralCode}`);
           
           // Store the referral code for this user (valid for 1 hour)
@@ -251,12 +283,7 @@ if (!botToken || botToken === 'your_bot_token_here' || botToken === '') {
           
           const keyboard = {
             inline_keyboard: [[
-              {
-                text: '🎮 Play',
-                web_app: {
-                  url: `${gameUrl}?start=${referralCode}`
-                }
-              }
+              buildLaunchButton('🎮 Play', referralCode)
             ]]
           };
 
@@ -269,12 +296,7 @@ if (!botToken || botToken === 'your_bot_token_here' || botToken === '') {
 
           const keyboard = {
             inline_keyboard: [[
-              {
-                text: '🎮 Play',
-                web_app: {
-                  url: gameUrl
-                }
-              }
+              buildLaunchButton('🎮 Play')
             ]]
           };
 
@@ -305,7 +327,7 @@ if (!botToken || botToken === 'your_bot_token_here' || botToken === '') {
     });
 
     console.log('✅ Telegram Bot is running!');
-    if (enableMiniApp) {
+    if (miniAppEnabled) {
       console.log('📱 Mini App mode enabled - users can access directly via Mini App');
     }
     
