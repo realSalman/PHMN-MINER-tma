@@ -1,6 +1,60 @@
 const User = require('../models/user');
 const socketManager = require('../socket/socketManager');
 
+// Mining levels configuration (matches client-side)
+const MINING_LEVELS = {
+  1: { multiplier: 1.0, coinsPerHour: 0.00463, coinsNeeded: null },
+  5: { multiplier: 1.2, coinsPerHour: 0.00556, coinsNeeded: 5 },
+  10: { multiplier: 1.5, coinsPerHour: 0.00694, coinsNeeded: 10 },
+  15: { multiplier: 1.8, coinsPerHour: 0.00833, coinsNeeded: 15 },
+  20: { multiplier: 2.2, coinsPerHour: 0.01019, coinsNeeded: 20 },
+  25: { multiplier: 2.8, coinsPerHour: 0.01296, coinsNeeded: 25 },
+  30: { multiplier: 3.5, coinsPerHour: 0.0162, coinsNeeded: 30 },
+  50: { multiplier: 5.0, coinsPerHour: 0.02315, coinsNeeded: 50 },
+};
+
+// Helper function to get mining rate from level
+const getMiningRateFromLevel = (level) => {
+  const levelData = MINING_LEVELS[level];
+  return levelData ? levelData.coinsPerHour : 0.00463; // Default to level 1
+};
+
+// Helper function to get effective mining rate with boost multiplier applied
+const getEffectiveMiningRate = (user) => {
+  const baseRate = getMiningRateFromLevel(user.miningLevel || 1);
+  
+  // Check if user has an active boost that hasn't expired
+  if (user.activeBoost && user.activeBoost.multiplier && user.activeBoost.endTime) {
+    const now = new Date();
+    const endTime = new Date(user.activeBoost.endTime);
+    
+    // Boost is active if it hasn't expired
+    if (now < endTime) {
+      const boostMultiplier = user.activeBoost.multiplier || 1;
+      const boostedRate = baseRate * boostMultiplier;
+      console.log(`🚀 Boost active (${user.activeBoost.mode}): ${baseRate.toFixed(5)} * ${boostMultiplier} = ${boostedRate.toFixed(5)} PHMN/hr`);
+      return boostedRate;
+    } else {
+      // Boost expired, clear it
+      console.log(`⏰ Boost expired for user ${user.telegramId}, clearing active boost`);
+      user.activeBoost = {
+        mode: null,
+        multiplier: 1,
+        startTime: null,
+        endTime: null,
+        duration: null,
+        tonAmount: 0,
+        usdAmount: 0,
+        transactionHash: null
+      };
+      // Save asynchronously to avoid blocking
+      user.save().catch(err => console.error('Error clearing expired boost:', err));
+    }
+  }
+  
+  return baseRate;
+};
+
 // Store online users in memory for real-time status
 const onlineUsers = new Map(); // telegramId -> socketId
 
@@ -1089,9 +1143,20 @@ const registerUserHandlers = (socket) => {
       user.miningSessionPendingRewards = 0; // Reset pending rewards
       await user.save();
 
-      // Calculate estimated rewards based on cycle duration
+      // Calculate effective mining rate (base rate * boost multiplier if active)
+      const currentMiningLevel = user.miningLevel || 1;
+      const baseMiningRate = getMiningRateFromLevel(currentMiningLevel);
+      const effectiveMiningRate = getEffectiveMiningRate(user);
+      
+      // Update base mining rate if it doesn't match the level (store base rate, not boosted)
+      if (user.miningRate !== baseMiningRate) {
+        user.miningRate = baseMiningRate;
+        await user.save();
+      }
+      
+      // Calculate estimated rewards based on cycle duration using effective rate
       const cycleDurationHours = cycleInfo.remainingSeconds / 3600;
-      const estimatedRewards = (user.miningRate || 100) * cycleDurationHours;
+      const estimatedRewards = effectiveMiningRate * cycleDurationHours;
 
       console.log(`✅ Mining session started for user ${telegramId}:`, {
         cycle: cycleInfo.cycle,
@@ -1105,7 +1170,13 @@ const registerUserHandlers = (socket) => {
         success: true,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
-        miningRate: user.miningRate || 100,
+        miningRate: effectiveMiningRate, // Return effective rate (with boost if active)
+        baseMiningRate: baseMiningRate, // Also return base rate for reference
+        miningLevel: currentMiningLevel,
+        activeBoost: user.activeBoost && user.activeBoost.endTime && new Date() < new Date(user.activeBoost.endTime) ? {
+          mode: user.activeBoost.mode,
+          multiplier: user.activeBoost.multiplier
+        } : null,
         estimatedRewards: estimatedRewards,
         cycle: cycleInfo.cycle,
         remainingTime: cycleInfo.remainingSeconds
@@ -1152,11 +1223,15 @@ const registerUserHandlers = (socket) => {
           sessionStatus = 'active';
           remainingTime = Math.max(0, Math.floor((user.miningSessionEndTime - now) / 1000));
           
+          // Calculate effective mining rate (base rate * boost multiplier if active)
+          const currentMiningLevel = user.miningLevel || 1;
+          const effectiveMiningRate = getEffectiveMiningRate(user);
+          
           // Calculate earned rewards so far (proportional to time elapsed in cycle)
           const elapsedHours = (now - user.miningSessionStartTime) / (1000 * 60 * 60);
           const totalCycleHours = (user.miningSessionEndTime - user.miningSessionStartTime) / (1000 * 60 * 60);
-          const totalRewards = (user.miningRate || 100) * totalCycleHours;
-          pendingRewards = Math.min(totalRewards, (user.miningRate || 100) * elapsedHours);
+          const totalRewards = effectiveMiningRate * totalCycleHours;
+          pendingRewards = Math.min(totalRewards, effectiveMiningRate * elapsedHours);
           
           console.log('✅ playMining:status - Active session:', {
             remainingTime,
@@ -1169,9 +1244,13 @@ const registerUserHandlers = (socket) => {
           sessionStatus = 'completed';
           remainingTime = 0;
           
-          // Calculate final rewards based on actual cycle duration
+          // Calculate effective mining rate (base rate * boost multiplier if active)
+          const currentMiningLevel = user.miningLevel || 1;
+          const effectiveMiningRate = getEffectiveMiningRate(user);
+          
+          // Calculate final rewards based on actual cycle duration using effective rate
           const totalCycleHours = (user.miningSessionEndTime - user.miningSessionStartTime) / (1000 * 60 * 60);
-          const calculatedRewards = (user.miningRate || 100) * totalCycleHours;
+          const calculatedRewards = effectiveMiningRate * totalCycleHours;
           
           // Always update pending rewards when session is completed
           if (user.miningSessionPendingRewards !== calculatedRewards) {
@@ -1190,12 +1269,33 @@ const registerUserHandlers = (socket) => {
       // CRITICAL: Always get fresh PHMN value from database
       const userPHMN = user.PHMN || 0;
       
+      // Calculate effective mining rate (base rate * boost multiplier if active)
+      const currentMiningLevel = user.miningLevel || 1;
+      const baseMiningRate = getMiningRateFromLevel(currentMiningLevel);
+      const effectiveMiningRate = getEffectiveMiningRate(user);
+      
+      // Update base mining rate if it doesn't match the level (store base rate, not boosted)
+      if (user.miningRate !== baseMiningRate) {
+        user.miningRate = baseMiningRate;
+        await user.save();
+      }
+      
+      // Check if boost is active
+      const isBoostActive = user.activeBoost && user.activeBoost.endTime && new Date() < new Date(user.activeBoost.endTime);
+      
       const response = {
         success: true,
         sessionStatus,
         remainingTime,
         pendingRewards: Math.floor(pendingRewards),
-        miningRate: user.miningRate || 100,
+        miningRate: effectiveMiningRate, // Return effective rate (with boost if active)
+        baseMiningRate: baseMiningRate, // Also return base rate for reference
+        miningLevel: currentMiningLevel,
+        activeBoost: isBoostActive ? {
+          mode: user.activeBoost.mode,
+          multiplier: user.activeBoost.multiplier,
+          endTime: user.activeBoost.endTime
+        } : null,
         startTime: user.miningSessionStartTime ? user.miningSessionStartTime.toISOString() : null,
         endTime: user.miningSessionEndTime ? user.miningSessionEndTime.toISOString() : null,
         PHMN: userPHMN // Always return PHMN from database
@@ -1235,11 +1335,17 @@ const registerUserHandlers = (socket) => {
         return callback && callback({ success: false, error: 'Mining session is still in progress' });
       }
 
+      // Calculate effective mining rate (base rate * boost multiplier if active)
+      const currentMiningLevel = user.miningLevel || 1;
+      const effectiveMiningRate = getEffectiveMiningRate(user);
+      
       // Check if there are rewards to claim
       if (user.miningSessionPendingRewards <= 0) {
-        // Calculate final rewards if not set
-        const finalRewards = (user.miningRate || 100) * 8;
+        // Calculate final rewards if not set using effective rate (fallback to 8 hours)
+        const totalCycleHours = (user.miningSessionEndTime - user.miningSessionStartTime) / (1000 * 60 * 60);
+        const finalRewards = effectiveMiningRate * (totalCycleHours || 8);
         user.miningSessionPendingRewards = finalRewards;
+        await user.save();
       }
 
       const rewardsToClaim = user.miningSessionPendingRewards;
@@ -1277,6 +1383,165 @@ const registerUserHandlers = (socket) => {
       });
     } catch (error) {
       console.error('Error claiming mining rewards:', error);
+      callback && callback({ success: false, error: error.message });
+    }
+  });
+
+  // Upgrade mining level
+  socket.on('mining:upgradeLevel', async (data, callback) => {
+    try {
+      const telegramId = data?.telegramId || socket.request.session?.telegramId;
+      if (!telegramId) {
+        return callback && callback({ success: false, error: 'Not authenticated' });
+      }
+
+      const { targetLevel } = data;
+      if (!targetLevel) {
+        return callback && callback({ success: false, error: 'Target level is required' });
+      }
+
+      const levelData = MINING_LEVELS[targetLevel];
+      if (!levelData) {
+        return callback && callback({ success: false, error: 'Invalid level' });
+      }
+
+      if (!levelData.coinsNeeded) {
+        return callback && callback({ success: false, error: 'Cannot upgrade to this level' });
+      }
+
+      const user = await User.findOne({ telegramId: parseInt(telegramId) });
+      if (!user) {
+        return callback && callback({ success: false, error: 'User not found' });
+      }
+
+      // Check if user already has this level or higher
+      if (user.miningLevel >= targetLevel) {
+        return callback && callback({ success: false, error: 'You already have this level or higher' });
+      }
+
+      // Check if user has enough PHMN to unlock (but don't deduct)
+      const userPHMN = user.PHMN || 0;
+      if (userPHMN < levelData.coinsNeeded) {
+        return callback && callback({ 
+          success: false, 
+          error: `You need at least ${levelData.coinsNeeded} PHMN to unlock this level.` 
+        });
+      }
+
+      // Upgrade level (no PHMN deduction - just requires having the amount)
+      user.miningLevel = targetLevel;
+      user.miningRate = levelData.coinsPerHour;
+      await user.save();
+
+      console.log(`✅ User ${telegramId} upgraded to mining level ${targetLevel}`);
+
+      callback && callback({
+        success: true,
+        newLevel: targetLevel,
+        newMiningRate: levelData.coinsPerHour,
+        newBalance: user.PHMN, // Balance remains unchanged
+        message: `Successfully unlocked level ${targetLevel}!`
+      });
+    } catch (error) {
+      console.error('Error upgrading mining level:', error);
+      callback && callback({ success: false, error: error.message });
+    }
+  });
+
+  // Purchase boost (Turbo 2x, Super 4x, Ultimate 6x)
+  socket.on('mining:purchaseBoost', async (data, callback) => {
+    try {
+      const telegramId = data?.telegramId || socket.request.session?.telegramId;
+      if (!telegramId) {
+        return callback && callback({ success: false, error: 'Not authenticated' });
+      }
+
+      const { mode, duration, multiplier, tonAmount, usdAmount, transactionHash } = data;
+      
+      if (!mode || !duration || !multiplier || !tonAmount || !usdAmount || !transactionHash) {
+        return callback && callback({ 
+          success: false, 
+          error: 'Missing required boost purchase data' 
+        });
+      }
+
+      // Validate mode
+      const validModes = ['turbo', 'super', 'ultimate'];
+      if (!validModes.includes(mode)) {
+        return callback && callback({ success: false, error: 'Invalid boost mode' });
+      }
+
+      // Validate duration
+      const validDurations = ['day', 'week', 'month'];
+      if (!validDurations.includes(duration)) {
+        return callback && callback({ success: false, error: 'Invalid duration' });
+      }
+
+      const user = await User.findOne({ telegramId: parseInt(telegramId) });
+      if (!user) {
+        return callback && callback({ success: false, error: 'User not found' });
+      }
+
+      // Calculate boost end time based on duration
+      const now = new Date();
+      let endTime = new Date(now);
+      switch (duration) {
+        case 'day':
+          endTime.setDate(now.getDate() + 1);
+          break;
+        case 'week':
+          endTime.setDate(now.getDate() + 7);
+          break;
+        case 'month':
+          endTime.setMonth(now.getMonth() + 1);
+          break;
+      }
+
+      // Set active boost
+      user.activeBoost = {
+        mode: mode,
+        multiplier: multiplier,
+        startTime: now,
+        endTime: endTime,
+        duration: duration,
+        tonAmount: tonAmount,
+        usdAmount: usdAmount,
+        transactionHash: transactionHash
+      };
+
+      // Add to boost history
+      if (!user.boostHistory) {
+        user.boostHistory = [];
+      }
+      user.boostHistory.push({
+        mode: mode,
+        multiplier: multiplier,
+        duration: duration,
+        tonAmount: tonAmount,
+        usdAmount: usdAmount,
+        transactionHash: transactionHash,
+        startTime: now,
+        endTime: endTime,
+        purchasedAt: now
+      });
+
+      await user.save();
+
+      console.log(`✅ User ${telegramId} purchased boost: ${mode} ${duration} (${multiplier}x) for ${tonAmount} TON`);
+
+      callback && callback({
+        success: true,
+        boost: {
+          mode: mode,
+          multiplier: multiplier,
+          startTime: now.toISOString(),
+          endTime: endTime.toISOString(),
+          duration: duration
+        },
+        message: `Successfully activated ${multiplier}x boost for ${duration === 'day' ? '1 day' : duration === 'week' ? '1 week' : '1 month'}!`
+      });
+    } catch (error) {
+      console.error('Error purchasing boost:', error);
       callback && callback({ success: false, error: error.message });
     }
   });
