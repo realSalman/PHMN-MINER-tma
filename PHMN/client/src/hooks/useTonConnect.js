@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { SERVER_WALLET_ADDRESS, MINING_PLAN_PRICES } from '../config/tonConnect';
+import { SERVER_WALLET_ADDRESS } from '../config/tonConnect';
 
 export const useTonConnect = () => {
   const [tonConnectUI] = useTonConnectUI();
@@ -63,32 +63,31 @@ export const useTonConnect = () => {
     }
   }, [tonConnectUI]);
 
-  // Send TON payment for mining plan
-  const sendPayment = useCallback(async (planLevel) => {
+  // Send TON payment - generic function for sending TON
+  const sendPayment = useCallback(async (tonAmount, recipientAddress = SERVER_WALLET_ADDRESS) => {
     if (!connected || !wallet) {
       setError('Wallet not connected');
-      return false;
+      return { success: false, error: 'Wallet not connected' };
     }
 
-    const amount = MINING_PLAN_PRICES[planLevel];
-    if (!amount) {
-      setError('Invalid plan level');
-      return false;
+    if (!recipientAddress) {
+      setError('Recipient address not specified');
+      return { success: false, error: 'Recipient address not specified' };
     }
 
     try {
       setLoading(true);
       setError(null);
 
-      console.log(`Sending payment for plan ${planLevel}: ${amount} TON`);
+      console.log(`Sending payment: ${tonAmount} TON to ${recipientAddress}`);
 
       // Create transaction using the UI provider
       const transaction = {
         validUntil: Math.floor(Date.now() / 1000) + 600,
         messages: [
           {
-            address: SERVER_WALLET_ADDRESS,
-            amount: (amount * 1000000000).toString()
+            address: recipientAddress,
+            amount: (tonAmount * 1000000000).toString() // Convert to nanotons
           }
         ]
       };
@@ -102,11 +101,12 @@ export const useTonConnect = () => {
         return {
           success: true,
           boc: result.boc,
+          transactionHash: result.boc,
           message: `Payment sent successfully! Transaction: ${result.boc}`
         };
       } else {
         setError('Transaction failed');
-        return { success: false };
+        return { success: false, error: 'Transaction failed' };
       }
 
     } catch (err) {
@@ -129,7 +129,7 @@ export const useTonConnect = () => {
       }
       
       setError(errorMessage);
-      return { success: false };
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
