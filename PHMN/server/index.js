@@ -31,6 +31,21 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Airdrop Mining Game Server is running' });
 });
 
+// Get server wallet address for TON payments
+app.get('/api/config/wallet-address', (req, res) => {
+  const walletAddress = process.env.SERVER_WALLET_ADDRESS;
+  if (!walletAddress) {
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Server wallet address not configured' 
+    });
+  }
+  res.json({ 
+    success: true, 
+    walletAddress: walletAddress 
+  });
+});
+
 app.post('/api/user/save', async (req, res) => {
   try {
     const user = await saveUserData(req.body);
