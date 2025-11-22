@@ -95,7 +95,7 @@ function AppContent() {
 
   // Initialize platform-aware socket connection
   useEffect(() => {
-    const SOCKET_URL = process.env.GAME_URL || (window.location.hostname === window.location.origin);
+    const SOCKET_URL = process.env.GAME_URL || window.location.origin;
     
     // Platform detection for socket configuration
     const isInTelegram = window.Telegram?.WebApp?.platform;
