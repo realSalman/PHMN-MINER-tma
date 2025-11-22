@@ -120,13 +120,15 @@ function AppContent() {
       withCredentials: true,
       transports: ['websocket', 'polling'],
       path: '/socket.io',
-      timeout: 5000,
+      timeout: 20000,
       reconnection: true,
-      reconnectionAttempts: 3,
-      reconnectionDelay: 3000,
-      reconnectionDelayMax: 10000,
-      pingTimeout: 20000,
-      pingInterval: 10000
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000, 
+      reconnectionDelayMax: 5000, 
+      randomizationFactor: 0.5,
+      pingTimeout: 20000, 
+      pingInterval: 5000, 
+      upgradeTimeout: 3000
     };
     
     if (isTelegramDesktop) {
@@ -134,10 +136,10 @@ function AppContent() {
       socketConfig = {
         ...socketConfig,
         reconnectionAttempts: 3,
-        reconnectionDelay: 2000,
-        reconnectionDelayMax: 8000,
-        pingTimeout: 15000,
-        pingInterval: 8000
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        pingTimeout: 20000,
+        pingInterval: 5000
       };
       console.log('💻 Desktop Telegram: Balanced socket configuration');
     } else if (isTelegramMobile) {
@@ -213,7 +215,6 @@ function AppContent() {
     }, connectionTimeoutMs);
 
     newSocket.on('connect', () => {
-      clearTimeout(connectionTimeout);
       console.log('🔌 Connected to server');
       
       // Process any pending referral code when socket connects
@@ -244,7 +245,6 @@ function AppContent() {
     setSocket(newSocket);
 
     return () => {
-      clearTimeout(connectionTimeout);
       newSocket.close();
     };
   }, [user, addNotification]);
