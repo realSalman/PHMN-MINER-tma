@@ -13,7 +13,8 @@ function Play() {
   const [balance, setBalance] = useState(0);
   const [miningState, setMiningState] = useState('idle'); // 'idle', 'active', 'completed'
   const [remainingTime, setRemainingTime] = useState(0);
-  const [miningRate, setMiningRate] = useState(100); // PHMN per hour
+  const [miningRate, setMiningRate] = useState(0.00463); // PHMN per hour (default level 1)
+  const [miningLevel, setMiningLevel] = useState(1); // Current mining level
   const [pendingRewards, setPendingRewards] = useState(0);
   const [estimatedRewards, setEstimatedRewards] = useState(0);
   const [miningProgress, setMiningProgress] = useState(0); // 0-100%
@@ -219,22 +220,29 @@ function Play() {
 
           setMiningState(response.sessionStatus);
           setRemainingTime(response.remainingTime);
-          setMiningRate(response.miningRate);
+          // Use effective mining rate (already includes boost multiplier if active)
+          setMiningRate(response.miningRate || response.baseMiningRate || 0.00463);
+          setMiningLevel(response.miningLevel || 1);
           setPendingRewards(response.pendingRewards);
           // CRITICAL: Always update balance from database PHMN value
           // This ensures balance always reflects the actual database value
           const dbPHMN = response.PHMN || 0;
           setBalance(dbPHMN);
           
+          // Log boost status if active
+          if (response.activeBoost) {
+            console.log(`🚀 Active boost: ${response.activeBoost.mode} (${response.activeBoost.multiplier}x)`);
+          }
+          
           // Calculate estimated rewards based on cycle duration (if available)
           if (response.startTime && response.endTime) {
             const startTime = new Date(response.startTime);
             const endTime = new Date(response.endTime);
             const cycleDurationHours = (endTime - startTime) / (1000 * 60 * 60);
-            setEstimatedRewards(response.miningRate * cycleDurationHours);
+            setEstimatedRewards((response.miningRate || 0.00463) * cycleDurationHours);
           } else {
             // Fallback to 8 hours if cycle info not available
-            setEstimatedRewards(response.miningRate * 8);
+            setEstimatedRewards((response.miningRate || 0.00463) * 8);
           }
           
           console.log('💾 Play: Balance updated from DB PHMN:', dbPHMN);
@@ -276,11 +284,19 @@ function Play() {
               if (response?.success) {
                 setMiningState(response.sessionStatus);
                 setRemainingTime(response.remainingTime);
+                // Use effective mining rate (already includes boost multiplier if active)
+                setMiningRate(response.miningRate || response.baseMiningRate || 0.00463);
+                setMiningLevel(response.miningLevel || 1);
                 setPendingRewards(response.pendingRewards);
                 // CRITICAL: Always sync balance from database PHMN value
                 const dbPHMN = response.PHMN || 0;
                 setBalance(dbPHMN);
                 console.log('🔄 Play: Balance synced from DB:', dbPHMN);
+                
+                // Log boost status if active
+                if (response.activeBoost) {
+                  console.log(`🚀 Active boost: ${response.activeBoost.mode} (${response.activeBoost.multiplier}x)`);
+                }
 
                 // Update progress based on actual cycle duration
                 if (response.sessionStatus === 'active' && response.remainingTime > 0 && response.startTime && response.endTime) {
@@ -351,12 +367,19 @@ function Play() {
     appSocket.emit('playMining:start', { telegramId: user.id }, (response) => {
       if (response?.success) {
         setMiningState('active');
-        setMiningRate(response.miningRate);
+        // Use effective mining rate (already includes boost multiplier if active)
+        setMiningRate(response.miningRate || response.baseMiningRate || 0.00463);
+        setMiningLevel(response.miningLevel || 1);
         setEstimatedRewards(response.estimatedRewards);
         // Calculate remaining time from endTime
         const endTime = new Date(response.endTime);
         const now = new Date();
         setRemainingTime(Math.max(0, Math.floor((endTime - now) / 1000)));
+        
+        // Log boost status if active
+        if (response.activeBoost) {
+          console.log(`🚀 Mining started with boost: ${response.activeBoost.mode} (${response.activeBoost.multiplier}x)`);
+        }
       } else {
         console.error('Failed to start mining:', response?.error);
         
@@ -625,7 +648,7 @@ function Play() {
                   className="w-5 h-5 select-none"
                   draggable="false"
                 />
-                <span>+{miningRate}</span>
+                <span>+{miningRate.toFixed(5)}</span>
               </div>
             </div>
           </div>
