@@ -2,7 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { motion } from 'framer-motion';
 import { SocketContext } from '../App';
 import { useTonConnect } from '../hooks/useTonConnect';
-import { SERVER_WALLET_ADDRESS } from '../config/tonConnect';
+import { getServerWalletAddress } from '../config/tonConnect';
 import { toUserFriendlyAddress } from '@tonconnect/sdk';
 import upgradeImg from '../images/upgrade.png';
 import phmnCoinImg from '../images/PHMN coin.png';
@@ -86,6 +86,7 @@ function Upgrade() {
   const [user, setUser] = useState(null);
   const [purchasingBoost, setPurchasingBoost] = useState(false);
   const [boostError, setBoostError] = useState(null);
+  const [serverWalletAddress, setServerWalletAddress] = useState(null);
   const appSocket = useContext(SocketContext);
   
   // TON Connect
@@ -98,6 +99,15 @@ function Upgrade() {
     disconnect, 
     tonConnectUI 
   } = useTonConnect();
+
+  // Fetch server wallet address on mount
+  useEffect(() => {
+    getServerWalletAddress().then(address => {
+      setServerWalletAddress(address);
+    }).catch(err => {
+      console.error('Failed to fetch server wallet address:', err);
+    });
+  }, []);
 
   const miningModes = [
     { id: 'basic', label: 'Basic', available: true },
@@ -220,10 +230,12 @@ function Upgrade() {
         return;
     }
 
-    if (!SERVER_WALLET_ADDRESS) {
-      setBoostError('Server wallet address not configured. set REACT_APP_SERVER_WALLET_ADDRESS .env file.');
+    // Get server wallet address
+    const walletAddress = await getServerWalletAddress();
+    if (!walletAddress) {
+      setBoostError('Server wallet address not configured. Please set SERVER_WALLET_ADDRESS in server .env file.');
       console.error('❌ SERVER_WALLET_ADDRESS is missing!');
-      console.error('📝 Please add REACT_APP_SERVER_WALLET_ADDRESS to PHMN/client/.env file');
+      console.error('📝 Please add SERVER_WALLET_ADDRESS to PHMN/server/.env file');
       return;
     }
 
@@ -238,7 +250,7 @@ function Upgrade() {
         validUntil: Math.floor(Date.now() / 1000) + 600,
         messages: [
           {
-            address: SERVER_WALLET_ADDRESS,
+            address: walletAddress,
             amount: (tonAmount * 1000000000).toString() // Convert to nanotons
           }
         ]
@@ -416,11 +428,19 @@ function Upgrade() {
             return (
               <div className="mb-6">
                 {/* Server Wallet Warning */}
-                {!SERVER_WALLET_ADDRESS && (
+                {serverWalletAddress === null && (
+                  <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-xl p-3 mb-4">
+                    <div className="text-xs text-yellow-400 font-semibold mb-1">⚠️ Loading Configuration</div>
+                    <div className="text-xs text-yellow-300">
+                      Loading server wallet address...
+                    </div>
+                  </div>
+                )}
+                {serverWalletAddress === false && (
                   <div className="bg-yellow-900/20 border border-yellow-500/50 rounded-xl p-3 mb-4">
                     <div className="text-xs text-yellow-400 font-semibold mb-1">⚠️ Configuration Required</div>
                     <div className="text-xs text-yellow-300">
-                      Server wallet address is not configured. Please set <code className="bg-black/30 px-1 rounded">REACT_APP_SERVER_WALLET_ADDRESS</code> in your .env file.
+                      Server wallet address is not configured. Please set <code className="bg-black/30 px-1 rounded">SERVER_WALLET_ADDRESS</code> in server .env file.
                     </div>
                   </div>
                 )}
@@ -441,10 +461,10 @@ function Upgrade() {
                             connect();
                           }
                         }}
-                        disabled={walletLoading || !SERVER_WALLET_ADDRESS}
+                        disabled={walletLoading || !serverWalletAddress}
                         className="bg-blue-500 hover:bg-blue-600 text-white text-sm px-4 py-2 rounded font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        whileHover={!walletLoading && SERVER_WALLET_ADDRESS ? { scale: 1.05 } : {}}
-                        whileTap={!walletLoading && SERVER_WALLET_ADDRESS ? { scale: 0.95 } : {}}
+                        whileHover={!walletLoading && serverWalletAddress ? { scale: 1.05 } : {}}
+                        whileTap={!walletLoading && serverWalletAddress ? { scale: 0.95 } : {}}
                       >
                         {walletLoading ? 'Connecting...' : 'Connect Wallet'}
                       </motion.button>
@@ -530,16 +550,16 @@ function Upgrade() {
                         {/* Action Button */}
                         <motion.button
                           onClick={() => handlePurchaseBoost(activeMiningMode, duration.id)}
-                          disabled={!connected || purchasingBoost || !SERVER_WALLET_ADDRESS}
+                          disabled={!connected || purchasingBoost || !serverWalletAddress}
                           className={`px-6 py-2 rounded-lg font-semibold text-sm transition-all ${
-                            connected && !purchasingBoost && SERVER_WALLET_ADDRESS
+                            connected && !purchasingBoost && serverWalletAddress
                               ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800'
                               : 'bg-gray-600 text-gray-400 cursor-not-allowed'
                           }`}
-                          whileHover={connected && !purchasingBoost && SERVER_WALLET_ADDRESS ? { scale: 1.05 } : {}}
-                          whileTap={connected && !purchasingBoost && SERVER_WALLET_ADDRESS ? { scale: 0.95 } : {}}
+                          whileHover={connected && !purchasingBoost && serverWalletAddress ? { scale: 1.05 } : {}}
+                          whileTap={connected && !purchasingBoost && serverWalletAddress ? { scale: 0.95 } : {}}
                         >
-                          {purchasingBoost ? 'Processing...' : !SERVER_WALLET_ADDRESS ? 'Not Configured' : 'GET'}
+                          {purchasingBoost ? 'Processing...' : !serverWalletAddress ? 'Not Configured' : 'GET'}
                         </motion.button>
                       </motion.div>
                     );
