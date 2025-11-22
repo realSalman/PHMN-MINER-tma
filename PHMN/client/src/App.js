@@ -788,7 +788,7 @@ function App() {
     if (typeof window !== 'undefined') {
       return `${window.location.origin}/tonconnect-manifest.json`;
     }
-    return `${process.env.GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org'}/tonconnect-manifest.json`;
+    return `${process.env.GAME_URL}/tonconnect-manifest.json`;
   };
 
   return (
