@@ -26,5 +26,48 @@ export const manifest = {
 };
 
 // wallet address for receiving payments
-// React apps require REACT_APP_ prefix for environment variables
-export const SERVER_WALLET_ADDRESS = process.env.REACT_APP_SERVER_WALLET_ADDRESS || process.env.SERVER_WALLET_ADDRESS;
+// Fetch from server API instead of client env variable
+let cachedWalletAddress = null;
+let walletAddressPromise = null;
+
+export const getServerWalletAddress = async () => {
+  // Return cached value if available
+  if (cachedWalletAddress) {
+    return cachedWalletAddress;
+  }
+  
+  // Return existing promise if already fetching
+  if (walletAddressPromise) {
+    return walletAddressPromise;
+  }
+  
+  // Fetch from server
+  walletAddressPromise = (async () => {
+    try {
+      const baseUrl = typeof window !== 'undefined' 
+        ? window.location.origin 
+        : process.env.REACT_APP_GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org';
+      
+      const response = await fetch(`${baseUrl}/api/config/wallet-address`);
+      const data = await response.json();
+      
+      if (data.success && data.walletAddress) {
+        cachedWalletAddress = data.walletAddress;
+        return data.walletAddress;
+      } else {
+        console.error('Failed to get wallet address from server:', data.error);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching wallet address from server:', error);
+      return null;
+    } finally {
+      walletAddressPromise = null;
+    }
+  })();
+  
+  return walletAddressPromise;
+};
+
+// For backward compatibility, export a getter that fetches async
+export const SERVER_WALLET_ADDRESS = null; // Will be fetched dynamically
