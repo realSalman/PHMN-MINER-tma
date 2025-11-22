@@ -14,7 +14,6 @@ function Play() {
   const [miningState, setMiningState] = useState('idle'); // 'idle', 'active', 'completed'
   const [remainingTime, setRemainingTime] = useState(0);
   const [miningRate, setMiningRate] = useState(0.00463); // PHMN per hour (default level 1)
-  const [miningLevel, setMiningLevel] = useState(1); // Current mining level
   const [pendingRewards, setPendingRewards] = useState(0);
   const [estimatedRewards, setEstimatedRewards] = useState(0);
   const [miningProgress, setMiningProgress] = useState(0); // 0-100%
@@ -222,7 +221,6 @@ function Play() {
           setRemainingTime(response.remainingTime);
           // Use effective mining rate (already includes boost multiplier if active)
           setMiningRate(response.miningRate || response.baseMiningRate || 0.00463);
-          setMiningLevel(response.miningLevel || 1);
           setPendingRewards(response.pendingRewards);
           // CRITICAL: Always update balance from database PHMN value
           // This ensures balance always reflects the actual database value
@@ -286,7 +284,6 @@ function Play() {
                 setRemainingTime(response.remainingTime);
                 // Use effective mining rate (already includes boost multiplier if active)
                 setMiningRate(response.miningRate || response.baseMiningRate || 0.00463);
-                setMiningLevel(response.miningLevel || 1);
                 setPendingRewards(response.pendingRewards);
                 // CRITICAL: Always sync balance from database PHMN value
                 const dbPHMN = response.PHMN || 0;
@@ -369,7 +366,6 @@ function Play() {
         setMiningState('active');
         // Use effective mining rate (already includes boost multiplier if active)
         setMiningRate(response.miningRate || response.baseMiningRate || 0.00463);
-        setMiningLevel(response.miningLevel || 1);
         setEstimatedRewards(response.estimatedRewards);
         // Calculate remaining time from endTime
         const endTime = new Date(response.endTime);
