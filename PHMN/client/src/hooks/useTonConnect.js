@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { SERVER_WALLET_ADDRESS } from '../config/tonConnect';
+import { getServerWalletAddress } from '../config/tonConnect';
 
 export const useTonConnect = () => {
   const [tonConnectUI] = useTonConnectUI();
@@ -64,10 +64,15 @@ export const useTonConnect = () => {
   }, [tonConnectUI]);
 
   // Send TON payment - generic function for sending TON
-  const sendPayment = useCallback(async (tonAmount, recipientAddress = SERVER_WALLET_ADDRESS) => {
+  const sendPayment = useCallback(async (tonAmount, recipientAddress = null) => {
     if (!connected || !wallet) {
       setError('Wallet not connected');
       return { success: false, error: 'Wallet not connected' };
+    }
+
+    // Get server wallet address if not provided
+    if (!recipientAddress) {
+      recipientAddress = await getServerWalletAddress();
     }
 
     if (!recipientAddress) {
