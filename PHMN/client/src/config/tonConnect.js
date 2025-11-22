@@ -6,7 +6,7 @@ const getBaseUrl = () => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
-  return process.env.REACT_APP_GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org';
+  return process.env.GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org';
 };
 
 const baseUrl = getBaseUrl();
@@ -46,7 +46,7 @@ export const getServerWalletAddress = async () => {
     try {
       const baseUrl = typeof window !== 'undefined' 
         ? window.location.origin 
-        : process.env.REACT_APP_GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org';
+        : process.env.GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org';
       
       const response = await fetch(`${baseUrl}/api/config/wallet-address`);
       const data = await response.json();
