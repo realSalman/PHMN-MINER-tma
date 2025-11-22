@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect, useMemo } from 'react';
 import { SocketContext } from '../App';
 import { useTonConnect } from '../hooks/useTonConnect';
-import { SERVER_WALLET_ADDRESS } from '../config/tonConnect';
+import { getServerWalletAddress } from '../config/tonConnect';
 import { toUserFriendlyAddress } from '@tonconnect/sdk';
 import { motion, AnimatePresence } from 'framer-motion';
 import tonIcon from '../images/ton.svg';
@@ -404,13 +404,13 @@ function MiningPage({ telegramUser }) {
       console.log(`💎 Sending payment for White Diamonds: ${tonAmount} TON`);
       console.log('💎 Wallet address:', wallet.address);
       
-      // Use the imported SERVER_WALLET_ADDRESS constant instead of process.env
-      const merchantWallet = SERVER_WALLET_ADDRESS;
+      // Fetch server wallet address from API
+      const merchantWallet = await getServerWalletAddress();
       console.log('💎 Merchant wallet:', merchantWallet);
       
       if (!merchantWallet) {
         console.log('❌ Merchant wallet not configured');
-        return { success: false, error: 'Merchant wallet not configured' };
+        return { success: false, error: 'Merchant wallet not configured. Please set SERVER_WALLET_ADDRESS in server .env file.' };
       }
 
       const amountInNanoTON = (tonAmount * 1000000000).toString();
