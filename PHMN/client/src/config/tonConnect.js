@@ -6,7 +6,7 @@ const getBaseUrl = () => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
   }
-  return process.env.GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org';
+  return process.env.GAME_URL || process.env.GAME_URL;
 };
 
 const baseUrl = getBaseUrl();
