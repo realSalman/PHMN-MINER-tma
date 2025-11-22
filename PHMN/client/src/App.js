@@ -95,7 +95,7 @@ function AppContent() {
 
   // Initialize platform-aware socket connection
   useEffect(() => {
-    const SOCKET_URL = process.env.GAME_URL;
+    const SOCKET_URL = process.env.REACT_APP_GAME_URL;
     
     // Platform detection for socket configuration
     const isInTelegram = window.Telegram?.WebApp?.platform;
@@ -788,7 +788,7 @@ function App() {
     if (typeof window !== 'undefined') {
       return `${window.location.origin}/tonconnect-manifest.json`;
     }
-    return `${process.env.GAME_URL}/tonconnect-manifest.json`;
+    return `${process.env.REACT_APP_GAME_URL}/tonconnect-manifest.json`;
   };
 
   return (
