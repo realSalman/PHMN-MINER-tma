@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext,useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { SocketContext } from '../App';
 import { useTonConnect } from '../hooks/useTonConnect';
@@ -72,15 +72,6 @@ const DURATION_OPTIONS = [
 
 function Upgrade() {
   const [activeMiningMode, setActiveMiningMode] = useState('basic');
-  const [claimCards, setClaimCards] = useState([
-    { id: 1, amount: 5000, claimed: false },
-    { id: 2, amount: 10000, claimed: false },
-    { id: 3, amount: 15000, claimed: false },
-    { id: 4, amount: 20000, claimed: false },
-    { id: 5, amount: 25000, claimed: false },
-    { id: 6, amount: 30000, claimed: false },
-    { id: 7, amount: 50000, claimed: false },
-  ]);
   const [currentMiningLevel, setCurrentMiningLevel] = useState(1);
   const [balance, setBalance] = useState(0);
   const [user, setUser] = useState(null);
@@ -116,6 +107,22 @@ function Upgrade() {
     { id: 'ultimate', label: 'Ultimate', available: true },
   ];
 
+    const loadUserData = useCallback((telegramId) => {
+    if (!appSocket || !appSocket.connected) {
+      setTimeout(() => loadUserData(telegramId), 500);
+      return;
+    }
+
+    appSocket.emit('playMining:status', { telegramId }, (response) => {
+      if (response?.success) {
+        setBalance(response.PHMN || 0);
+        // Get mining level from server (will be added to response)
+        setCurrentMiningLevel(response.miningLevel || 1);
+      }
+    });
+  }, [appSocket]);
+
+
   // Load user data and mining level
   useEffect(() => {
     const initializeTelegram = () => {
@@ -138,22 +145,7 @@ function Upgrade() {
       }
     };
     initializeTelegram();
-  }, [appSocket]);
-
-  const loadUserData = (telegramId) => {
-    if (!appSocket || !appSocket.connected) {
-      setTimeout(() => loadUserData(telegramId), 500);
-      return;
-    }
-
-    appSocket.emit('playMining:status', { telegramId }, (response) => {
-      if (response?.success) {
-        setBalance(response.PHMN || 0);
-        // Get mining level from server (will be added to response)
-        setCurrentMiningLevel(response.miningLevel || 1);
-      }
-    });
-  };
+  }, [appSocket, loadUserData]);
 
   const handleUpgrade = (level) => {
     if (!appSocket || !appSocket.connected || !user) {
@@ -184,12 +176,6 @@ function Upgrade() {
         alert(response?.error || 'Failed to unlock level');
       }
     });
-  };
-
-  const handleClaim = (cardId) => {
-    setClaimCards(prev => prev.map(card => 
-      card.id === cardId ? { ...card, claimed: true } : card
-    ));
   };
 
   // Handle Boost purchase with TON
