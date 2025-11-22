@@ -51,9 +51,32 @@ const userSchema = new mongoose.Schema({
   miningSessionStartTime: { type: Date, default: null }, // When the current 8-hour session started
   miningSessionEndTime: { type: Date, default: null }, // When the current 8-hour session ends (startTime + 8 hours)
   miningSessionPendingRewards: { type: Number, default: 0 }, // earned but not yet claimed
-  miningRate: { type: Number, default: 100 }, // per hour (default 100 PHMN/HR)
+  miningLevel: { type: Number, default: 1 }, // Mining level (1, 5, 10, 15, 20, 25, 30, 50)
+  miningRate: { type: Number, default: 0.00463 }, // per hour (calculated from mining level)
   timezone: { type: String, default: null }, // User's timezone (e.g., "America/New_York", "Europe/London")
   
+  // Mining Boost System (Turbo 2x, Super 4x, Ultimate 6x)
+  activeBoost: {
+    mode: { type: String, enum: ['turbo', 'super', 'ultimate'], default: null }, // Boost type
+    multiplier: { type: Number, default: 1 }, // Applied multiplier (2x, 4x, or 6x)
+    startTime: { type: Date, default: null }, // When boost was activated
+    endTime: { type: Date, default: null }, // When boost expires
+    duration: { type: String, enum: ['day', 'week', 'month'], default: null }, // Duration type
+    tonAmount: { type: Number, default: 0 }, // TON paid for boost
+    usdAmount: { type: Number, default: 0 }, // USD equivalent
+    transactionHash: { type: String, default: null } // TON transaction hash
+  },
+  boostHistory: [{ // History of all boost purchases
+    mode: { type: String, enum: ['turbo', 'super', 'ultimate'] },
+    multiplier: { type: Number },
+    duration: { type: String },
+    tonAmount: { type: Number },
+    usdAmount: { type: Number },
+    transactionHash: { type: String },
+    startTime: { type: Date },
+    endTime: { type: Date },
+    purchasedAt: { type: Date, default: Date.now }
+  }],
 
   // TON wallet integration
   walletAddress: { type: String, default: null }, // User's TON wallet address
