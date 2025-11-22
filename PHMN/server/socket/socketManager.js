@@ -16,7 +16,7 @@ const socketManager = {
 
         this.io = new Server(server, {
             cors: {
-                origin: ["https://app.phoneminer.org", process.env.GAME_URL],
+                origin: [process.env.GAME_URL],
                 credentials: true,
             },
             allowRequest: (req, callback) => {
