@@ -17,7 +17,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const app = express();
 
 app.use(require('cors')({
-  origin: ['http://localhost:3000', process.env.GAME_URL ],
+  origin: [ process.env.GAME_URL ],
   credentials: true
 }));
 app.use(express.json()); // Add JSON body parsing
