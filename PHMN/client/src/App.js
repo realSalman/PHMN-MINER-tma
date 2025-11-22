@@ -783,8 +783,16 @@ function AppContent() {
 }
 
 function App() {
+  // Get the base URL for manifest - use current origin in browser
+  const getManifestUrl = () => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/tonconnect-manifest.json`;
+    }
+    return `${process.env.REACT_APP_GAME_URL || process.env.GAME_URL || 'https://app.phoneminer.org'}/tonconnect-manifest.json`;
+  };
+
   return (
-    <TonConnectUIProvider manifestUrl={`${process.env.GAME_URL}/tonconnect-manifest.json`}>
+    <TonConnectUIProvider manifestUrl={getManifestUrl()}>
       <BrowserRouter>
           <AppContent />
       </BrowserRouter>
