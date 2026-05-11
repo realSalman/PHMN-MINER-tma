@@ -1,6 +1,8 @@
-# PHMN Miner — Telegram Mini App (TMA)
+# PHONE MINER — Telegram Mini App (TMA)
 
 A robust, full-stack Telegram Mini App built for the **PHMN** ecosystem. This application integrates Telegram's Web App capabilities with the **TON Blockchain** to provide a seamless mining and reward experience.
+
+### THE APP IS LIVE- https://t.me/PHMN_miner_bot/
 
 ## 🚀 Overview
 
@@ -13,14 +15,12 @@ PHMN Miner is a high-performance Telegram Mini App designed for engagement. It f
 - **Styling**: Tailwind CSS
 - **Animations**: Framer Motion
 - **Blockchain**: TON Connect SDK (`@tonconnect/ui-react`)
-- **Real-time**: Socket.io Client
 
 ### Backend
 - **Runtime**: Node.js
 - **Server**: Express.js
-- **Database**: MongoDB via Mongoose
+- **Database**: MongoDB
 - **Real-time**: Socket.io
-- **Bot Integration**: Node Telegram Bot API
 
 ## ✨ Key Features
 
@@ -34,12 +34,9 @@ PHMN Miner is a high-performance Telegram Mini App designed for engagement. It f
 ## 📂 Project Structure
 
 ```text
-├── client/          # React frontend (Create React App)
-├── server/          # Express backend & Telegram bot logic
-└── README.md        # Project documentation
+├── client/          # React frontend
+├── server/          # Express backend
 ```
-
-## ⚙️ Getting Started
 
 ### Development Tip
 To test the Telegram Mini App locally, use a tunneling service like **ngrok** or **Localtunnel** to expose your local server to the internet, then set the `TG_GAME_URL` in your `.env` to the secure tunnel URL.
@@ -48,29 +45,6 @@ To test the Telegram Mini App locally, use a tunneling service like **ngrok** or
 - Node.js (v18+)
 - MongoDB (Local or Atlas)
 - Telegram Bot Token (from @BotFather)
-
-### Installation
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/your-username/PHMN-MINER-tma.git
-   cd PHMN-MINER-tma
-   ```
-
-2. **Setup Server**:
-   ```bash
-   cd server
-   npm install
-   # Create a .env file based on the keys below
-   npm start
-   ```
-
-3. **Setup Client**:
-   ```bash
-   cd ../client
-   npm install
-   npm start
-   ```
 
 ### Environment Variables
 
