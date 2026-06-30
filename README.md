@@ -1,4 +1,4 @@
-# PHONE MINER — Telegram Mini App (TMA)
+ # PHONE MINER — Telegram Mini App (TMA)
 
 A robust, full-stack Telegram Mini App built for the **PHMN** ecosystem. This application integrates Telegram's Web App capabilities with the **TON Blockchain** to provide a seamless mining and reward experience.
 
@@ -58,6 +58,6 @@ To test the Telegram Mini App locally, use a tunneling service like **ngrok** or
 
 ## 📄 License
 
-Copyright © 2024. All Rights Reserved.
+Copyright © 2025. All Rights Reserved.
 
 This project is proprietary. The source code is available for viewing and educational purposes only. Unauthorized copying, modification, distribution, or any other use of this code is strictly prohibited.
